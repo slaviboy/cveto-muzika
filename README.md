@@ -4,6 +4,8 @@ A real-time music visualizer for the browser. Aurora listens to the microphone (
 
 Audio is analyzed locally. Nothing is recorded, stored or uploaded.
 
+**Live:** https://slaviboy.github.io/cveto-muzika/
+
 ## Running it
 
 Requires Node 20+ (developed on Node 26) and a browser with WebGL2.
@@ -25,6 +27,10 @@ Production build:
 npm run build        # type-checks, then bundles to dist/
 npm run preview      # serves dist/ on http://localhost:4173
 ```
+
+## Deployment
+
+`.github/workflows/deploy.yml` runs on every pull request and push to `main`: install, type-check, lint, unit tests and a production build. Pushes to `main` are then published to GitHub Pages. Project pages are served from `/<repository>/`, so the workflow builds with `--base "/<repository>/"`; local builds keep `/`. GitHub Pages is HTTPS, so the microphone works there, including on phones.
 
 ## Scripts
 

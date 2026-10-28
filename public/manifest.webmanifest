@@ -2,10 +2,11 @@
   "name": "Aurora",
   "short_name": "Aurora",
   "description": "Live sound turned into frequency-reactive light.",
-  "start_url": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "fullscreen",
   "orientation": "any",
   "background_color": "#030407",
   "theme_color": "#030407",
-  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
 }
