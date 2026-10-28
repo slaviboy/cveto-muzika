@@ -1,0 +1,199 @@
+@import 'tailwindcss';
+
+/*
+ * Aurora design tokens.
+ * The canvas carries all the color; the chrome stays graphite and ice so the user's own
+ * channel palette is the only saturated color on screen.
+ */
+@theme {
+  --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-void: #030407;
+  --color-graphite-950: #07080c;
+  --color-graphite-900: #0c0e13;
+  --color-graphite-800: #13161d;
+  --color-graphite-700: #1b1f28;
+  --color-graphite-600: #262b36;
+  --color-graphite-500: #343a47;
+  --color-line: rgb(200 212 255 / 0.085);
+  --color-line-strong: rgb(200 212 255 / 0.16);
+  --color-ink: #e9ecf5;
+  --color-ink-muted: #8b90a4;
+  --color-ink-faint: #5c6173;
+  --color-ice: #dce6ff;
+  --color-ice-dim: #9fb0d6;
+  --color-signal: #7cf5cf;
+  --color-danger: #ff7a88;
+  --color-warn: #ffc56b;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.05rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.2rem;
+
+  --radius-control: 8px;
+  --radius-panel: 16px;
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  html {
+    background: var(--color-void);
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ice);
+    outline-offset: 2px;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  ::selection {
+    background: rgb(220 230 255 / 0.25);
+  }
+}
+
+@layer components {
+  .aurora-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    user-select: none;
+  }
+
+  /* Smoked-glass surface for floating chrome. */
+  .glass {
+    background: rgb(12 14 19 / 0.72);
+    -webkit-backdrop-filter: blur(20px) saturate(1.25);
+    backdrop-filter: blur(20px) saturate(1.25);
+    border: 1px solid var(--color-line);
+    box-shadow:
+      0 1px 0 0 rgb(255 255 255 / 0.04) inset,
+      0 18px 48px -18px rgb(0 0 0 / 0.7);
+  }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-stretch: 84%;
+    letter-spacing: 0.005em;
+  }
+
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-graphite-500) transparent;
+  }
+
+  .scroll-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: var(--color-graphite-500);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .checker {
+    background-image:
+      linear-gradient(45deg, #2a2e38 25%, transparent 25%),
+      linear-gradient(-45deg, #2a2e38 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #2a2e38 75%),
+      linear-gradient(-45deg, transparent 75%, #2a2e38 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  }
+
+  .chrome-fade {
+    transition:
+      opacity 420ms var(--ease-out-soft),
+      transform 420ms var(--ease-out-soft);
+  }
+
+  .chrome-hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-6px);
+  }
+
+  .aurora-color-picker .react-colorful {
+    width: 100%;
+    height: 168px;
+  }
+
+  .aurora-color-picker .react-colorful__saturation {
+    border-radius: 10px 10px 0 0;
+    border-bottom: none;
+  }
+
+  .aurora-color-picker .react-colorful__hue {
+    height: 14px;
+    border-radius: 0 0 10px 10px;
+  }
+
+  .aurora-color-picker .react-colorful__pointer {
+    width: 18px;
+    height: 18px;
+    border-width: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
