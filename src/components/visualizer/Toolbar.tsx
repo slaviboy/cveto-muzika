@@ -2,26 +2,29 @@ import { DropdownMenu } from 'radix-ui'
 import { Check, ChevronDown, Expand, Loader2, Mic, MicOff, Play, Settings2, Shrink, Square } from 'lucide-react'
 import { startDemo, startMicrophone, stopAudio } from '../../app/engine'
 import { useFullscreen, useIsDesktop, useMediaQuery } from '../../hooks'
+import { useT } from '../../i18n/useT'
 import { BUILTIN_PRESETS } from '../../presets/builtinPresets'
 import { VISUALIZATION_MODES } from '../../state/settingsSchema'
 import { useAppStore } from '../../state/useAppStore'
-import { IconButton, Tooltip } from '../ui/primitives'
 import { cn } from '../../utils/cn'
+import { LanguageMenu } from '../ui/LanguageSwitch'
+import { IconButton, Tooltip } from '../ui/primitives'
 import { LiveMark, MiniMeter, ModeGlyph } from './glyphs'
 import { MODE_LABELS } from './modeLabels'
 
 export function ModeSwitcher({ compact }: { compact?: boolean }) {
+  const t = useT()
   const mode = useAppStore((s) => s.settings.mode)
   const setMode = useAppStore((s) => s.setMode)
   return (
-    <div role="radiogroup" aria-label="Visualization mode" className="flex items-center gap-0.5">
+    <div role="radiogroup" aria-label={t('Visualization mode')} className="flex items-center gap-0.5">
       {VISUALIZATION_MODES.map((m, i) => (
-        <Tooltip key={m} content={`${MODE_LABELS[m]} (${i + 1})`}>
+        <Tooltip key={m} content={`${t(MODE_LABELS[m])} (${i + 1})`}>
           <button
             type="button"
             role="radio"
             aria-checked={mode === m}
-            aria-label={MODE_LABELS[m]}
+            aria-label={t(MODE_LABELS[m])}
             data-testid={`mode-${m}`}
             onClick={() => setMode(m)}
             className={cn(
@@ -30,7 +33,7 @@ export function ModeSwitcher({ compact }: { compact?: boolean }) {
             )}
           >
             <ModeGlyph mode={m} />
-            {!compact && mode === m && <span className="hidden pr-0.5 lg:inline">{MODE_LABELS[m]}</span>}
+            {!compact && mode === m && <span className="hidden pr-0.5 lg:inline">{t(MODE_LABELS[m])}</span>}
           </button>
         </Tooltip>
       ))}
@@ -39,6 +42,7 @@ export function ModeSwitcher({ compact }: { compact?: boolean }) {
 }
 
 export function AudioStatusPill({ compact }: { compact?: boolean }) {
+  const t = useT()
   const status = useAppStore((s) => s.audio.status)
   const device = useAppStore((s) => s.audio.activeDeviceLabel)
   const error = useAppStore((s) => s.audio.error)
@@ -47,12 +51,12 @@ export function AudioStatusPill({ compact }: { compact?: boolean }) {
     return (
       <span data-testid="audio-status" data-status="requesting" className="flex h-9 items-center gap-2 rounded-full px-3 text-xs text-ink-muted" role="status">
         <Loader2 size={15} className="animate-spin" />
-        {!compact && 'Waiting for permission…'}
+        {!compact && t('Waiting for permission…')}
       </span>
     )
   }
   if (status === 'live' || status === 'demo') {
-    const label = status === 'live' ? 'Stop microphone' : 'Stop demo'
+    const label = status === 'live' ? t('Stop microphone') : t('Stop demo')
     return (
       <Tooltip content={status === 'live' && device ? `${label} — ${device}` : label}>
         <button
@@ -67,7 +71,7 @@ export function AudioStatusPill({ compact }: { compact?: boolean }) {
             <span className="absolute inset-0 animate-ping rounded-full bg-signal/60" />
             <span className="relative size-2 rounded-full bg-signal" />
           </span>
-          <span className="font-[560]">{status === 'live' ? 'Live' : 'Demo'}</span>
+          <span className="font-[560]">{status === 'live' ? t('Live') : t('Demo')}</span>
           {!compact && status === 'live' && device && <span className="hidden max-w-36 truncate text-ink-muted xl:inline">{device}</span>}
           <MiniMeter className="text-ink-muted group-hover:hidden" />
           <Square size={11} className="hidden fill-current group-hover:block" aria-hidden="true" />
@@ -80,24 +84,26 @@ export function AudioStatusPill({ compact }: { compact?: boolean }) {
       type="button"
       data-testid="audio-status"
       data-status="idle"
-      aria-label="Start microphone"
+      aria-label={t('Start microphone')}
       onClick={() => void startMicrophone()}
       className="flex h-9 items-center gap-2 rounded-full pl-3 pr-3.5 text-xs text-ink transition-colors hover:bg-white/[0.08] pointer-coarse:h-11"
     >
       {error ? <MicOff size={15} className="text-danger" /> : <Mic size={15} />}
-      {!compact && <span>{error ? 'Microphone off' : 'Start microphone'}</span>}
+      {!compact && <span>{error ? t('Microphone off') : t('Start microphone')}</span>}
     </button>
   )
 }
 
 export function PresetMenu() {
+  const t = useT()
   const activeId = useAppStore((s) => s.activePresetId)
   const dirty = useAppStore((s) => s.presetDirty)
   const userPresets = useAppStore((s) => s.userPresets)
   const applyBuiltin = useAppStore((s) => s.applyBuiltinPreset)
   const applyUser = useAppStore((s) => s.applyUserPreset)
   const setUi = useAppStore((s) => s.setUi)
-  const name = BUILTIN_PRESETS.find((p) => p.id === activeId)?.name ?? userPresets.find((p) => p.id === activeId)?.name ?? 'Custom'
+  const builtin = BUILTIN_PRESETS.find((p) => p.id === activeId)
+  const name = builtin ? t(builtin.name) : (userPresets.find((p) => p.id === activeId)?.name ?? t('Custom'))
 
   const item = 'flex h-8 cursor-pointer select-none items-center gap-2.5 rounded-md px-2 text-xs text-ink outline-none data-[highlighted]:bg-white/[0.08]'
   return (
@@ -105,10 +111,10 @@ export function PresetMenu() {
       <DropdownMenu.Trigger
         data-testid="preset-menu"
         className="flex h-9 max-w-48 items-center gap-1.5 rounded-full px-3 text-xs text-ink hover:bg-white/[0.07]"
-        aria-label={`Preset: ${name}${dirty ? ' (edited)' : ''}`}
+        aria-label={dirty ? t('Preset: {name} (edited)', { name }) : t('Preset: {name}', { name })}
       >
         <span className="truncate">{name}</span>
-        {dirty && <span className="text-2xs text-ink-faint">edited</span>}
+        {dirty && <span className="text-2xs text-ink-faint">{t('edited')}</span>}
         <ChevronDown size={13} className="shrink-0 text-ink-muted" />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -118,20 +124,20 @@ export function PresetMenu() {
           collisionPadding={12}
           className="scroll-thin z-[85] max-h-[min(70vh,560px)] w-64 overflow-y-auto rounded-[14px] border border-line-strong bg-graphite-800/95 p-1.5 shadow-2xl backdrop-blur-xl"
         >
-          <DropdownMenu.Label className="px-2 pb-1 pt-1.5 text-2xs text-ink-faint">Built-in looks</DropdownMenu.Label>
+          <DropdownMenu.Label className="px-2 pb-1 pt-1.5 text-2xs text-ink-faint">{t('Built-in looks')}</DropdownMenu.Label>
           {BUILTIN_PRESETS.map((p) => (
             <DropdownMenu.Item key={p.id} className={item} onSelect={() => applyBuiltin(p.id)}>
               <span className="text-ink-muted">
                 <ModeGlyph mode={p.mode} size={15} />
               </span>
-              <span className="flex-1 truncate">{p.name}</span>
+              <span className="flex-1 truncate">{t(p.name)}</span>
               {activeId === p.id && <Check size={13} className="text-ice" />}
             </DropdownMenu.Item>
           ))}
           {userPresets.length > 0 && (
             <>
               <DropdownMenu.Separator className="my-1.5 h-px bg-line" />
-              <DropdownMenu.Label className="px-2 pb-1 pt-1 text-2xs text-ink-faint">Your presets</DropdownMenu.Label>
+              <DropdownMenu.Label className="px-2 pb-1 pt-1 text-2xs text-ink-faint">{t('Your presets')}</DropdownMenu.Label>
               {userPresets.map((p) => (
                 <DropdownMenu.Item key={p.id} className={item} onSelect={() => applyUser(p.id)}>
                   <span className="flex-1 truncate">{p.name}</span>
@@ -142,7 +148,7 @@ export function PresetMenu() {
           )}
           <DropdownMenu.Separator className="my-1.5 h-px bg-line" />
           <DropdownMenu.Item className={item} onSelect={() => setUi({ settingsOpen: true, section: 'presets' })}>
-            Save, import or export…
+            {t('Save, import or export…')}
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
@@ -151,6 +157,7 @@ export function PresetMenu() {
 }
 
 export function Toolbar() {
+  const t = useT()
   const hidden = useAppStore((s) => s.ui.uiHidden)
   const settingsOpen = useAppStore((s) => s.ui.settingsOpen)
   const setUi = useAppStore((s) => s.setUi)
@@ -178,17 +185,18 @@ export function Toolbar() {
         <AudioStatusPill compact={!desktop} />
         {desktop && <PresetMenu />}
         {status === 'idle' && desktop && (
-          <IconButton label="Play demo track (D)" onClick={() => void startDemo()} data-testid="toolbar-demo">
+          <IconButton label={t('Play demo track (D)')} onClick={() => void startDemo()} data-testid="toolbar-demo">
             <Play size={15} />
           </IconButton>
         )}
+        {desktop && <LanguageMenu />}
         {fullscreen.supported && (desktop || wide) && (
-          <IconButton label={fullscreen.isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'} onClick={() => void fullscreen.toggle()}>
+          <IconButton label={fullscreen.isFullscreen ? t('Exit fullscreen (F)') : t('Fullscreen (F)')} onClick={() => void fullscreen.toggle()}>
             {fullscreen.isFullscreen ? <Shrink size={16} /> : <Expand size={16} />}
           </IconButton>
         )}
         <IconButton
-          label={settingsOpen ? 'Close settings (S)' : 'Settings (S)'}
+          label={settingsOpen ? t('Close settings (S)') : t('Settings (S)')}
           active={settingsOpen}
           aria-expanded={settingsOpen}
           data-testid="settings-toggle"

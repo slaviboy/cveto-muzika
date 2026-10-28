@@ -4,6 +4,7 @@ import { immer } from 'zustand/middleware/immer'
 import { findBuiltinPreset } from '../presets/builtinPresets'
 import { mergePresetIntoSettings, toPresetSettings, type UserPreset } from '../presets/presetIO'
 import type { AudioState } from '../types/audio'
+import { detectLocale, isLocale, relabelBandName, type Locale } from '../i18n'
 import { createId, isPlainObject } from '../utils/misc'
 import { CHANNEL_LAYOUTS, createChannel, defaultChannels, duplicateChannel, generateChannels, moveItem, nextChannel, type ChannelLayoutId } from './channelOps'
 import { createDefaultSettings, detectProfile, PERFORMANCE_PROFILES, performanceDefaults } from './defaults'
@@ -59,6 +60,8 @@ export interface AppState {
   audio: AudioState
   system: SystemState
   toasts: Toast[]
+  /** UI language (persisted, not part of presets). */
+  locale: Locale
 
   update: (recipe: (s: Settings) => void) => void
   updateChannel: (id: string, recipe: (ch: ChannelConfig) => void) => void
@@ -85,12 +88,14 @@ export interface AppState {
   setSystem: (patch: Partial<SystemState>) => void
   toast: (message: string, tone?: Toast['tone']) => void
   dismissToast: (id: string) => void
+  setLocale: (locale: Locale) => void
 }
 
 export const settingsStorage = createDebouncedStorage(300)
 export const STORAGE_KEY = 'aurora:state'
 
-const defaultsFor = () => createDefaultSettings(detectProfile())
+const initialLocale = detectLocale()
+const defaultsFor = () => createDefaultSettings(detectProfile(), initialLocale)
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -119,6 +124,7 @@ export const useAppStore = create<AppState>()(
         audio: { status: 'idle', error: null, devices: [], activeDeviceLabel: '', sampleRate: 48000 },
         system: { webgl2: null, contextLost: false, reducedMotionSystem: false },
         toasts: [],
+        locale: initialLocale,
 
         update: mutate,
 
@@ -133,7 +139,7 @@ export const useAppStore = create<AppState>()(
         addChannel: () =>
           mutate((s) => {
             if (s.channels.length >= MAX_CHANNELS) return
-            s.channels.push(nextChannel(s.channels))
+            s.channels.push(nextChannel(s.channels, get().locale))
           }),
 
         removeChannel: (id) =>
@@ -148,7 +154,7 @@ export const useAppStore = create<AppState>()(
           mutate((s) => {
             if (s.channels.length >= MAX_CHANNELS) return
             const index = s.channels.findIndex((c) => c.id === id)
-            if (index >= 0) s.channels.splice(index + 1, 0, duplicateChannel(s.channels[index]))
+            if (index >= 0) s.channels.splice(index + 1, 0, duplicateChannel(s.channels[index], get().locale))
           }),
 
         moveChannel: (from, to) =>
@@ -158,12 +164,12 @@ export const useAppStore = create<AppState>()(
 
         applyChannelLayout: (layout) =>
           mutate((s) => {
-            s.channels = CHANNEL_LAYOUTS[layout].build()
+            s.channels = CHANNEL_LAYOUTS[layout].build(get().locale)
           }),
 
         generateChannelBands: (count) =>
           mutate((s) => {
-            s.channels = generateChannels(count, s.audio.minFrequency, s.audio.maxFrequency, s.audio.frequencyScale)
+            s.channels = generateChannels(count, s.audio.minFrequency, s.audio.maxFrequency, s.audio.frequencyScale, undefined, get().locale)
           }),
 
         setMode: (mode) =>
@@ -196,7 +202,7 @@ export const useAppStore = create<AppState>()(
                 break
               }
               case 'channels':
-                s.channels = defaultChannels()
+                s.channels = defaultChannels(state.locale)
                 break
               case 'mode':
                 s.mode = d.mode
@@ -213,6 +219,7 @@ export const useAppStore = create<AppState>()(
               case 'colors':
                 s.color = d.color
                 s.background = d.background
+                s.effects.particles.enabled = d.effects.particles.enabled
                 break
               case 'timing':
                 s.timing = d.timing
@@ -247,7 +254,7 @@ export const useAppStore = create<AppState>()(
           set((state) => {
             const performance = state.settings.performance
             const deviceId = state.settings.audio.deviceId
-            state.settings = createDefaultSettings()
+            state.settings = createDefaultSettings('balanced', state.locale)
             state.settings.performance = performance
             state.settings.audio.deviceId = deviceId
             state.activePresetId = 'aurora'
@@ -257,7 +264,7 @@ export const useAppStore = create<AppState>()(
         applyBuiltinPreset: (id) => {
           const preset = findBuiltinPreset(id)
           if (!preset) return
-          const { settings } = mergePresetIntoSettings(get().settings, preset.build())
+          const { settings } = mergePresetIntoSettings(get().settings, preset.build(get().locale))
           get().applySettings(settings, preset.id)
         },
 
@@ -342,6 +349,15 @@ export const useAppStore = create<AppState>()(
           set((state) => {
             state.toasts = state.toasts.filter((t) => t.id !== id)
           }),
+
+        setLocale: (locale) =>
+          set((state) => {
+            const from = state.locale
+            if (from === locale) return
+            state.locale = locale
+            // Generated channel names follow the language; names the user typed stay as they are.
+            for (const ch of state.settings.channels) ch.name = relabelBandName(ch.name, from, locale)
+          }),
       }
     }),
     {
@@ -353,6 +369,7 @@ export const useAppStore = create<AppState>()(
         userPresets: state.userPresets,
         activePresetId: state.activePresetId,
         presetDirty: state.presetDirty,
+        locale: state.locale,
       }),
       migrate: (persisted, version) => {
         const state = isPlainObject(persisted) ? { ...persisted } : {}
@@ -386,6 +403,7 @@ export function mergePersisted(persisted: unknown, current: AppState): AppState 
     userPresets,
     activePresetId,
     presetDirty: persisted.presetDirty === true,
+    locale: isLocale(persisted.locale) ? persisted.locale : current.locale,
   }
 }
 

@@ -1,6 +1,7 @@
 import { Mic, Play, Square } from 'lucide-react'
 import { binWidth } from '../../../audio/frequencyMath'
 import { audioEngine, startDemo, startMicrophone, stopAudio } from '../../../app/engine'
+import { useT } from '../../../i18n/useT'
 import { FFT_SIZES } from '../../../state/settingsSchema'
 import { useAppStore } from '../../../state/useAppStore'
 import { DominantTone, InputLevelMeter, SpectrumStrip } from '../../audio/SpectrumStrip'
@@ -11,7 +12,8 @@ import { useSettingsGroup } from '../sectionMeta'
 const DEFAULT_DEVICE = '__default__'
 
 export function AudioInputSection() {
-  const [audio, set] = useSettingsGroup('audio')
+  const t = useT()
+  const [audio, set, d] = useSettingsGroup('audio')
   const status = useAppStore((s) => s.audio.status)
   const devices = useAppStore((s) => s.audio.devices)
   const deviceLabel = useAppStore((s) => s.audio.activeDeviceLabel)
@@ -19,12 +21,12 @@ export function AudioInputSection() {
   const demo = status === 'demo'
 
   const statusText = live
-    ? `Listening to ${deviceLabel || 'the microphone'}`
+    ? t('Listening to {device}', { device: deviceLabel || t('the microphone') })
     : demo
-      ? 'Playing the demo track'
+      ? t('Playing the demo track')
       : status === 'requesting'
-        ? 'Waiting for microphone permission…'
-        : 'Not listening'
+        ? t('Waiting for microphone permission…')
+        : t('Not listening')
 
   const chooseDevice = async (id: string) => {
     set('deviceId', id === DEFAULT_DEVICE ? '' : id)
@@ -42,64 +44,78 @@ export function AudioInputSection() {
             <InputLevelMeter />
           </div>
           <p className="mt-2 flex items-center justify-between text-2xs text-ink-faint">
-            <span>Strongest tone</span>
+            <span>{t('Strongest tone')}</span>
             <DominantTone className="text-xs text-ink-muted" />
           </p>
           <div className="mt-3.5 flex flex-wrap gap-2">
             {live ? (
               <Button size="sm" onClick={() => void stopAudio()}>
-                <Square size={12} className="fill-current" /> Stop microphone
+                <Square size={12} className="fill-current" /> {t('Stop microphone')}
               </Button>
             ) : (
               <Button size="sm" variant="primary" onClick={() => void startMicrophone()} disabled={status === 'requesting'}>
-                <Mic size={13} /> Start microphone
+                <Mic size={13} /> {t('Start microphone')}
               </Button>
             )}
             {demo ? (
               <Button size="sm" onClick={() => void stopAudio()}>
-                <Square size={12} className="fill-current" /> Stop demo
+                <Square size={12} className="fill-current" /> {t('Stop demo')}
               </Button>
             ) : (
               <Button size="sm" variant="ghost" onClick={() => void startDemo()}>
-                <Play size={13} /> Play demo track
+                <Play size={13} /> {t('Play demo track')}
               </Button>
             )}
           </div>
         </div>
         {devices.length > 0 ? (
           <SelectField
-            label="Input device"
-            value={audio.deviceId && devices.some((d) => d.deviceId === audio.deviceId) ? audio.deviceId : DEFAULT_DEVICE}
-            options={[{ value: DEFAULT_DEVICE, label: 'System default' }, ...devices.filter((d) => d.deviceId && d.deviceId !== 'default').map((d) => ({ value: d.deviceId, label: d.label }))]}
+            label={t('Input device')}
+            value={audio.deviceId && devices.some((dv) => dv.deviceId === audio.deviceId) ? audio.deviceId : DEFAULT_DEVICE}
+            options={[
+              { value: DEFAULT_DEVICE, label: t('System default') },
+              ...devices.filter((dv) => dv.deviceId && dv.deviceId !== 'default').map((dv) => ({ value: dv.deviceId, label: dv.label })),
+            ]}
             onChange={(v) => void chooseDevice(v)}
           />
         ) : (
           <Button size="sm" variant="ghost" className="self-start" onClick={() => void audioEngine.listDevices()}>
-            Look for input devices
+            {t('Look for input devices')}
           </Button>
         )}
       </Group>
 
-      <Group title="Level">
-        <SliderField label="Input gain" value={audio.gainDb} onChange={(v) => set('gainDb', v)} min={-36} max={36} step={0.5} unit="dB" defaultValue={0} />
-        <SliderField label="Sensitivity" value={audio.sensitivity} onChange={(v) => set('sensitivity', v)} min={0} max={8} step={0.05} unit="×" defaultValue={1} />
-        <Hint>Gain shifts the measured level in decibels before anything else. Sensitivity scales the result for every channel.</Hint>
+      <Group title={t('Level')}>
+        <SliderField label={t('Input gain')} value={audio.gainDb} onChange={(v) => set('gainDb', v)} min={-36} max={36} step={0.5} unit="dB" defaultValue={d.gainDb} />
+        <SliderField label={t('Sensitivity')} value={audio.sensitivity} onChange={(v) => set('sensitivity', v)} min={0} max={8} step={0.05} unit="×" defaultValue={d.sensitivity} />
+        <Hint>{t('Gain shifts the measured level in decibels before anything else. Sensitivity scales the result for every channel.')}</Hint>
       </Group>
 
-      <Group title="Demo track">
-        <SwitchField label="Play through speakers" description="Visuals react either way" checked={audio.demoMonitor} onChange={(v) => set('demoMonitor', v)} />
-        <SliderField label="Volume" value={audio.demoVolume * 100} onChange={(v) => set('demoVolume', v / 100)} min={0} max={100} step={1} unit="%" disabled={!audio.demoMonitor} />
+      <Group title={t('Demo track')}>
+        <SwitchField label={t('Play through speakers')} description={t('Visuals react either way')} checked={audio.demoMonitor} onChange={(v) => set('demoMonitor', v)} />
+        <SliderField
+          label={t('Volume')}
+          value={audio.demoVolume * 100}
+          onChange={(v) => set('demoVolume', v / 100)}
+          min={0}
+          max={100}
+          step={1}
+          unit="%"
+          defaultValue={d.demoVolume * 100}
+          disabled={!audio.demoMonitor}
+        />
       </Group>
 
       <Hint>
-        Aurora asks for the microphone only when you press start, and stops it completely when you stop. Sound is analyzed in this browser and is never recorded or sent anywhere.
+        {t('Aurora asks for the microphone only when you press start, and stops it completely when you stop. Sound is analyzed in this browser and is never recorded or sent anywhere.')}
       </Hint>
     </div>
   )
 }
 
 export function FftSection() {
-  const [audio, set] = useSettingsGroup('audio')
+  const t = useT()
+  const [audio, set, d] = useSettingsGroup('audio')
   const sampleRate = useAppStore((s) => s.audio.sampleRate)
   const resolution = binWidth(sampleRate, audio.fftSize)
   const windowMs = (audio.fftSize / sampleRate) * 1000
@@ -109,76 +125,118 @@ export function FftSection() {
       <Group>
         <SpectrumStrip />
       </Group>
-      <Group title="Analysis window">
+      <Group title={t('Analysis window')}>
         <SegmentedField
-          label="FFT size"
+          label={t('FFT size')}
           value={String(audio.fftSize)}
           options={FFT_SIZES.map((n) => ({ value: String(n), label: n >= 1024 ? `${n / 1024}k` : String(n) }))}
           onChange={(v) => set('fftSize', Number(v) as (typeof FFT_SIZES)[number])}
           testIdPrefix="fft"
         />
         <Hint>
-          <span className="num text-ink">{resolution.toFixed(1)} Hz</span> per bin at {(sampleRate / 1000).toFixed(1)} kHz, window{' '}
-          <span className="num text-ink">{windowMs.toFixed(0)} ms</span>. Larger sizes separate low notes better but react a little later.
+          {t('{resolution} per bin at {rate}, window {window}. Larger sizes separate low notes better but react a little later.', {
+            resolution: `${resolution.toFixed(1)} Hz`,
+            rate: `${(sampleRate / 1000).toFixed(1)} kHz`,
+            window: `${windowMs.toFixed(0)} ms`,
+          })}
         </Hint>
-        <SliderField label="Analyser smoothing" value={audio.smoothingTimeConstant} onChange={(v) => set('smoothingTimeConstant', v)} min={0} max={0.99} step={0.01} defaultValue={0.45} />
+        <SliderField label={t('Analyser smoothing')} value={audio.smoothingTimeConstant} onChange={(v) => set('smoothingTimeConstant', v)} min={0} max={0.99} step={0.01} defaultValue={d.smoothingTimeConstant} />
       </Group>
-      <Group title="Range">
-        <SliderField label="Floor" value={audio.minDecibels} onChange={(v) => set('minDecibels', Math.min(v, audio.maxDecibels - 10))} min={-140} max={-30} step={1} unit="dB" defaultValue={-92} />
-        <SliderField label="Ceiling" value={audio.maxDecibels} onChange={(v) => set('maxDecibels', Math.max(v, audio.minDecibels + 10))} min={-80} max={0} step={1} unit="dB" defaultValue={-22} />
+      <Group title={t('Range')}>
+        <SliderField label={t('Floor')} value={audio.minDecibels} onChange={(v) => set('minDecibels', Math.min(v, audio.maxDecibels - 10))} min={-140} max={-30} step={1} unit="dB" defaultValue={d.minDecibels} />
+        <SliderField label={t('Ceiling')} value={audio.maxDecibels} onChange={(v) => set('maxDecibels', Math.max(v, audio.minDecibels + 10))} min={-80} max={0} step={1} unit="dB" defaultValue={d.maxDecibels} />
         <RangeField
-          label="Displayed frequencies"
+          label={t('Displayed frequencies')}
           low={audio.minFrequency}
           high={audio.maxFrequency}
           min={10}
           max={Math.min(24000, sampleRate / 2)}
+          defaultLow={d.minFrequency}
+          defaultHigh={d.maxFrequency}
           onChange={(lo, hi) => {
             set('minFrequency', Math.max(10, Math.min(2000, lo)))
             set('maxFrequency', Math.max(500, Math.min(24000, hi)))
           }}
         />
         <SegmentedField
-          label="Frequency axis"
+          label={t('Frequency axis')}
           value={audio.frequencyScale}
           options={[
-            { value: 'log', label: 'Logarithmic' },
-            { value: 'linear', label: 'Linear' },
+            { value: 'log', label: t('Logarithmic') },
+            { value: 'linear', label: t('Linear') },
           ]}
           onChange={(v) => set('frequencyScale', v)}
         />
       </Group>
-      <Group title="Balance">
-        <SliderField label="Treble tilt" value={audio.tiltDbPerOctave} onChange={(v) => set('tiltDbPerOctave', v)} min={-6} max={12} step={0.5} unit="dB/oct" defaultValue={3} hint="Music loses energy toward the treble. Tilting the spectrum up by a few dB per octave (around 1 kHz) keeps high bands as lively as low ones." />
+      <Group title={t('Balance')}>
+        <SliderField
+          label={t('Treble tilt')}
+          value={audio.tiltDbPerOctave}
+          onChange={(v) => set('tiltDbPerOctave', v)}
+          min={-6}
+          max={12}
+          step={0.5}
+          unit="dB/oct"
+          defaultValue={d.tiltDbPerOctave}
+          hint={t('Music loses energy toward the treble. Tilting the spectrum up by a few dB per octave (around 1 kHz) keeps high bands as lively as low ones.')}
+        />
       </Group>
-      <Group title="Noise and stability">
-        <SliderField label="Noise reduction" value={audio.noiseReduction} onChange={(v) => set('noiseReduction', v)} min={0} max={1} step={0.01} defaultValue={0.35} hint="Subtracts a slowly adapting estimate of the background noise floor." />
+      <Group title={t('Noise and stability')}>
+        <SliderField
+          label={t('Noise reduction')}
+          value={audio.noiseReduction}
+          onChange={(v) => set('noiseReduction', v)}
+          min={0}
+          max={1}
+          step={0.01}
+          defaultValue={d.noiseReduction}
+          hint={t('Subtracts a slowly adapting estimate of the background noise floor.')}
+        />
         <SelectField
-          label="Spectral filter"
+          label={t('Spectral filter')}
           value={audio.spectralFilter}
           options={[
-            { value: 'off', label: 'Off' },
-            { value: 'median3', label: 'Median, 3 bins' },
-            { value: 'median5', label: 'Median, 5 bins' },
+            { value: 'off', label: t('Off') },
+            { value: 'median3', label: t('Median, 3 bins') },
+            { value: 'median5', label: t('Median, 5 bins') },
           ]}
           onChange={(v) => set('spectralFilter', v)}
         />
-        <SliderField label="Adaptive threshold" value={audio.adaptiveThreshold} onChange={(v) => set('adaptiveThreshold', v)} min={0} max={1} step={0.01} defaultValue={0} hint="Raises each channel's threshold toward its recent average, so steady sound fades and changes stand out." />
+        <SliderField
+          label={t('Adaptive threshold')}
+          value={audio.adaptiveThreshold}
+          onChange={(v) => set('adaptiveThreshold', v)}
+          min={0}
+          max={1}
+          step={0.01}
+          defaultValue={d.adaptiveThreshold}
+          hint={t("Raises each channel's threshold toward its recent average, so steady sound fades and changes stand out.")}
+        />
       </Group>
-      <Group title="Automatic gain">
+      <Group title={t('Automatic gain')}>
         <SegmentedField
-          label="Normalize levels"
+          label={t('Normalize levels')}
           value={audio.autoGain}
           options={[
-            { value: 'off', label: 'Off' },
-            { value: 'global', label: 'Together' },
-            { value: 'perChannel', label: 'Per channel' },
+            { value: 'off', label: t('Off') },
+            { value: 'global', label: t('Together') },
+            { value: 'perChannel', label: t('Per channel') },
           ]}
           onChange={(v) => set('autoGain', v)}
         />
-        <SliderField label="Target level" value={audio.autoGainTarget} onChange={(v) => set('autoGainTarget', v)} min={0.3} max={1} step={0.01} disabled={audio.autoGain === 'off'} />
+        <SliderField label={t('Target level')} value={audio.autoGainTarget} onChange={(v) => set('autoGainTarget', v)} min={0.3} max={1} step={0.01} defaultValue={d.autoGainTarget} disabled={audio.autoGain === 'off'} />
       </Group>
-      <Group title="Beats">
-        <SliderField label="Beat threshold" value={audio.beatSensitivity} onChange={(v) => set('beatSensitivity', v)} min={0.5} max={3} step={0.05} defaultValue={1.35} hint="Lower values detect more beats. Beats drive flashes, shockwaves and LED pulse waves." />
+      <Group title={t('Beats')}>
+        <SliderField
+          label={t('Beat threshold')}
+          value={audio.beatSensitivity}
+          onChange={(v) => set('beatSensitivity', v)}
+          min={0.5}
+          max={3}
+          step={0.05}
+          defaultValue={d.beatSensitivity}
+          hint={t('Lower values detect more beats. Beats drive flashes, shockwaves and LED pulse waves.')}
+        />
       </Group>
     </div>
   )

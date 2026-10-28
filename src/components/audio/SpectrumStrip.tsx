@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { DISPLAY_BINS } from '../../audio/AudioPipeline'
 import { formatHz, frequencyToNote, frequencyToPosition } from '../../audio/frequencyMath'
 import { useLiveFrame } from '../../hooks'
+import { useT } from '../../i18n/useT'
 import { channelRange } from '../../state/channelOps'
 import { useAppStore } from '../../state/useAppStore'
 
@@ -12,6 +13,7 @@ const TICKS = [50, 100, 200, 500, 1000, 2000, 5000, 10000]
  * spectrum each band listens to. The highlighted channel (being edited) is emphasised.
  */
 export function SpectrumStrip({ highlightId, height = 84 }: { highlightId?: string | null; height?: number }) {
+  const t = useT()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const channels = useAppStore((s) => s.settings.channels)
   const audio = useAppStore((s) => s.settings.audio)
@@ -109,7 +111,7 @@ export function SpectrumStrip({ highlightId, height = 84 }: { highlightId?: stri
       className="block w-full rounded-[10px] border border-line bg-graphite-950/80"
       style={{ height }}
       role="img"
-      aria-label="Live spectrum with channel ranges"
+      aria-label={t('Live spectrum with channel ranges')}
     />
   )
 }

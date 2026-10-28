@@ -3,15 +3,17 @@ import { toHex } from '../../../color/colorMath'
 import { rainbowColor, resolveStops, sampleStops } from '../../../color/gradient'
 import { bandCenter, frequencyToPosition } from '../../../audio/frequencyMath'
 import { useLiveFrame } from '../../../hooks'
+import { useT } from '../../../i18n/useT'
 import { channelRange, deriveChannelColors, paletteSource } from '../../../state/channelOps'
-import { MAX_DELAY_MS, type EffectsSettings, type Settings } from '../../../state/settingsSchema'
+import { MAX_DELAY_MS, type Settings } from '../../../state/settingsSchema'
 import { useAppStore } from '../../../state/useAppStore'
+import { cn } from '../../../utils/cn'
 import { ColorField } from '../../ui/ColorField'
 import { GradientEditor } from '../../ui/GradientEditor'
 import { Button, Group, Hint, SegmentedField, SelectField, SwitchField } from '../../ui/primitives'
-import { cn } from '../../../utils/cn'
 import { NumberInput, SliderField } from '../../ui/SliderField'
-import { useSettingsGroup } from '../sectionMeta'
+import { EFFECTS, type EffectKey } from '../effectsMeta'
+import { channelDefaults, factoryDefaults, useSettingsGroup } from '../sectionMeta'
 
 /** CSS preview of the frequency → color map exactly as the renderer builds it. */
 function frequencyMapCss(s: Settings): string {
@@ -43,16 +45,18 @@ function hexRgb(hex: string): [number, number, number] {
 }
 
 export function ColorsSection() {
+  const t = useT()
   const settings = useAppStore((s) => s.settings)
   const update = useAppStore((s) => s.update)
-  const [color, setColor] = useSettingsGroup('color')
-  const [bg, setBg] = useSettingsGroup('background')
+  const [color, setColor, dc] = useSettingsGroup('color')
+  const [bg, setBg, db] = useSettingsGroup('background')
   const [rings, setRings] = useSettingsGroup('rings')
   const preview = useMemo(() => frequencyMapCss(settings), [settings])
+  const particles = settings.effects.particles
 
   return (
     <div className="flex flex-col gap-5">
-      <Group title="Frequency to color">
+      <Group title={t('Frequency to color')}>
         <div className="flex flex-col gap-1">
           <div className="h-7 rounded-[8px] border border-line" style={{ background: preview }} data-testid="frequency-map-preview" />
           <div className="num flex justify-between text-2xs text-ink-faint">
@@ -61,12 +65,12 @@ export function ColorsSection() {
           </div>
         </div>
         <SegmentedField
-          label="Colors come from"
+          label={t('Colors come from')}
           value={color.source}
           options={[
-            { value: 'channels', label: 'Channels' },
-            { value: 'palette', label: 'Palette' },
-            { value: 'rainbow', label: 'Rainbow' },
+            { value: 'channels', label: t('Channels') },
+            { value: 'palette', label: t('Palette') },
+            { value: 'rainbow', label: t('Rainbow') },
           ]}
           onChange={(v) => setColor('source', v)}
         />
@@ -84,81 +88,119 @@ export function ColorsSection() {
                 })
               }
             >
-              Paint channels with this palette
+              {t('Paint channels with this palette')}
             </Button>
           </>
         )}
-        <SliderField label="Blend between bands" value={color.crossfade * 100} onChange={(v) => setColor('crossfade', v / 100)} min={0} max={100} step={1} unit="%" defaultValue={65} hint="0% keeps hard color bands; 100% blends smoothly from one band's color into the next." />
+        <SliderField
+          label={t('Blend between bands')}
+          value={color.crossfade * 100}
+          onChange={(v) => setColor('crossfade', v / 100)}
+          min={0}
+          max={100}
+          step={1}
+          unit="%"
+          defaultValue={dc.crossfade * 100}
+          hint={t("0% keeps hard color bands; 100% blends smoothly from one band's color into the next.")}
+        />
         <SelectField
-          label="Blend in"
+          label={t('Blend in')}
           value={color.interpolation}
           options={[
-            { value: 'oklab', label: 'OKLab (perceptual)' },
-            { value: 'oklch', label: 'OKLCh (vivid hues)' },
-            { value: 'linear', label: 'Linear light' },
+            { value: 'oklab', label: t('OKLab (perceptual)') },
+            { value: 'oklch', label: t('OKLCh (vivid hues)') },
+            { value: 'linear', label: t('Linear light') },
             { value: 'srgb', label: 'sRGB' },
             { value: 'hsl', label: 'HSL' },
           ]}
           onChange={(v) => setColor('interpolation', v)}
         />
         <SegmentedField
-          label="Color follows"
+          label={t('Color follows')}
           value={color.drive}
           options={[
-            { value: 'frequency', label: 'Frequency' },
-            { value: 'energy', label: 'Energy' },
-            { value: 'both', label: 'Both' },
+            { value: 'frequency', label: t('Frequency') },
+            { value: 'energy', label: t('Energy') },
+            { value: 'both', label: t('Both') },
           ]}
           onChange={(v) => setColor('drive', v)}
         />
-        <Hint>Energy moves each element from its channel's gradient start toward its gradient end as it gets louder.</Hint>
+        <Hint>{t("Energy moves each element from its channel's gradient start toward its gradient end as it gets louder.")}</Hint>
       </Group>
-      <Group title="Grading">
-        <SliderField label="Saturation" value={color.saturation * 100} onChange={(v) => setColor('saturation', v / 100)} min={0} max={200} step={1} unit="%" defaultValue={100} />
-        <SliderField label="Luminance" value={color.luminance * 100} onChange={(v) => setColor('luminance', v / 100)} min={20} max={200} step={1} unit="%" defaultValue={100} />
-        <SliderField label="Glow tint" value={color.glowTint * 100} onChange={(v) => setColor('glowTint', v / 100)} min={0} max={100} step={1} unit="%" hint="How much each glow takes its channel's glow color." />
+      <Group title={t('Grading')}>
+        <SliderField label={t('Saturation')} value={color.saturation * 100} onChange={(v) => setColor('saturation', v / 100)} min={0} max={200} step={1} unit="%" defaultValue={dc.saturation * 100} />
+        <SliderField label={t('Luminance')} value={color.luminance * 100} onChange={(v) => setColor('luminance', v / 100)} min={20} max={200} step={1} unit="%" defaultValue={dc.luminance * 100} />
+        <SliderField
+          label={t('Glow tint')}
+          value={color.glowTint * 100}
+          onChange={(v) => setColor('glowTint', v / 100)}
+          min={0}
+          max={100}
+          step={1}
+          unit="%"
+          defaultValue={dc.glowTint * 100}
+          hint={t("How much each glow takes its channel's glow color.")}
+        />
         {settings.mode === 'rings' && (
           <SelectField
-            label="Ring coloring"
+            label={t('Ring coloring')}
             value={rings.colorStyle}
             options={[
-              { value: 'channel', label: 'By channel' },
-              { value: 'radial', label: 'Radial gradient' },
-              { value: 'angular', label: 'Around each ring' },
-              { value: 'energy', label: 'By energy' },
+              { value: 'channel', label: t('By channel') },
+              { value: 'radial', label: t('By distance from center') },
+              { value: 'angular', label: t('Around each ring') },
+              { value: 'energy', label: t('By energy') },
             ]}
             onChange={(v) => setRings('colorStyle', v)}
           />
         )}
       </Group>
-      <Group title="Background">
+      <Group title={t('Background')}>
+        <SwitchField
+          label={t('Background visuals')}
+          description={t('Floating particles behind the visualization')}
+          checked={particles.enabled}
+          onChange={(v) => update((s) => void (s.effects.particles.enabled = v))}
+          testId="background-visuals"
+        />
         <SegmentedField
-          label="Style"
+          label={t('Style')}
           value={bg.style}
           options={[
-            { value: 'radial', label: 'Radial' },
-            { value: 'linear', label: 'Linear' },
-            { value: 'solid', label: 'Solid' },
+            { value: 'radial', label: t('Radial') },
+            { value: 'linear', label: t('Linear') },
+            { value: 'solid', label: t('Solid') },
           ]}
           onChange={(v) => setBg('style', v)}
         />
-        <ColorField label={bg.style === 'solid' ? 'Color' : 'Center / start'} value={bg.colorA} onChange={(v) => setBg('colorA', v)} />
-        {bg.style !== 'solid' && <ColorField label="Edge / end" value={bg.colorB} onChange={(v) => setBg('colorB', v)} />}
-        {bg.style === 'linear' && <SliderField label="Angle" value={bg.angle} onChange={(v) => setBg('angle', v)} min={0} max={360} step={1} unit="°" />}
-        <SliderField label="Breathes with bass" value={bg.reactivity * 100} onChange={(v) => setBg('reactivity', v / 100)} min={0} max={100} step={1} unit="%" />
+        <ColorField label={bg.style === 'solid' ? t('Color') : t('Center / start')} value={bg.colorA} onChange={(v) => setBg('colorA', v)} />
+        {bg.style !== 'solid' && <ColorField label={t('Edge / end')} value={bg.colorB} onChange={(v) => setBg('colorB', v)} />}
+        {bg.style === 'linear' && <SliderField label={t('Angle')} value={bg.angle} onChange={(v) => setBg('angle', v)} min={0} max={360} step={1} unit="°" defaultValue={db.angle} />}
+        <SliderField
+          label={t('Breathes with bass')}
+          value={bg.reactivity * 100}
+          onChange={(v) => setBg('reactivity', v / 100)}
+          min={0}
+          max={100}
+          step={1}
+          unit="%"
+          defaultValue={db.reactivity * 100}
+          hint={t('0% keeps the background completely still.')}
+        />
       </Group>
     </div>
   )
 }
 
 function ChannelTable({ columns, render }: { columns: string[]; render: (index: number) => ReactNode[] }) {
+  const t = useT()
   const channels = useAppStore((s) => s.settings.channels)
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-separate border-spacing-y-1 text-left">
         <thead>
           <tr className="text-2xs text-ink-faint">
-            <th className="pb-1 font-normal">Channel</th>
+            <th className="pb-1 font-normal">{t('Channel')}</th>
             {columns.map((c) => (
               <th key={c} className="pb-1 text-right font-normal">
                 {c}
@@ -188,8 +230,9 @@ function ChannelTable({ columns, render }: { columns: string[]; render: (index: 
   )
 }
 
-/** Small timeline showing undelayed vs delayed energy, so delay settings can be heard and seen. */
+/** Small timeline showing undelayed vs delayed energy, so delay settings can be seen. */
 function DelayScope() {
+  const t = useT()
   const ref = useRef<HTMLCanvasElement>(null)
   const channels = useAppStore((s) => s.settings.channels)
   const hist = useRef<{ live: number[]; out: number[] }>({ live: [], out: [] })
@@ -232,12 +275,13 @@ function DelayScope() {
     draw(hist.current.live, 'rgba(220,230,255,0.3)', 2)
     draw(hist.current.out, 'rgba(220,230,255,0.95)', 2.5)
   })
-  return <canvas ref={ref} className="h-16 w-full rounded-[10px] border border-line bg-graphite-950/80" aria-label="Energy before and after delay" role="img" />
+  return <canvas ref={ref} className="h-16 w-full rounded-[10px] border border-line bg-graphite-950/80" aria-label={t('Energy before and after delay')} role="img" />
 }
 
 export function TimingSection() {
-  const [timing, setTiming] = useSettingsGroup('timing')
-  const [audio, setAudio] = useSettingsGroup('audio')
+  const t = useT()
+  const [timing, setTiming, dt] = useSettingsGroup('timing')
+  const [audio, setAudio, da] = useSettingsGroup('audio')
   const updateChannel = useAppStore((s) => s.updateChannel)
   const updateAll = useAppStore((s) => s.updateAllChannels)
   const channels = useAppStore((s) => s.settings.channels)
@@ -245,119 +289,130 @@ export function TimingSection() {
 
   return (
     <div className="flex flex-col gap-5">
-      <Group title="Delay per channel">
+      <Group title={t('Delay per channel')}>
         <DelayScope />
-        <Hint>Faint line: energy as it arrives. Bright line: what the visuals show after each channel's delay.</Hint>
+        <Hint>{t('Faint line: energy as it arrives. Bright line: what the visuals show after each channel’s delay.')}</Hint>
         <ChannelTable
-          columns={['Delay', 'Attack', 'Release']}
+          columns={[t('Delay'), t('Attack'), t('Release')]}
           render={(i) => {
             const ch = channels[i]
             return [
-              <NumberInput key="d" label={`${ch.name} delay`} testId={`delay-input-${i}`} value={ch.delayMs} onCommit={(v) => updateChannel(ch.id, (c) => void (c.delayMs = v))} min={0} max={MAX_DELAY_MS} step={5} digits={0} unit="ms" />,
-              <NumberInput key="a" label={`${ch.name} attack`} value={ch.attackMs} onCommit={(v) => updateChannel(ch.id, (c) => void (c.attackMs = v))} min={0} max={2000} step={1} digits={0} unit="ms" />,
-              <NumberInput key="r" label={`${ch.name} release`} value={ch.releaseMs} onCommit={(v) => updateChannel(ch.id, (c) => void (c.releaseMs = v))} min={0} max={5000} step={5} digits={0} unit="ms" />,
+              <NumberInput key="d" label={t('{name} delay', { name: ch.name })} testId={`delay-input-${i}`} value={ch.delayMs} onCommit={(v) => updateChannel(ch.id, (c) => void (c.delayMs = v))} min={0} max={MAX_DELAY_MS} step={5} digits={0} unit="ms" />,
+              <NumberInput key="a" label={t('{name} attack', { name: ch.name })} value={ch.attackMs} onCommit={(v) => updateChannel(ch.id, (c) => void (c.attackMs = v))} min={0} max={2000} step={1} digits={0} unit="ms" />,
+              <NumberInput key="r" label={t('{name} release', { name: ch.name })} value={ch.releaseMs} onCommit={(v) => updateChannel(ch.id, (c) => void (c.releaseMs = v))} min={0} max={5000} step={5} digits={0} unit="ms" />,
             ]
           }}
         />
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="ghost" onClick={() => updateAll((c) => void (c.delayMs = 0))}>
-            Clear delays
+            {t('Clear delays')}
           </Button>
           <span className="flex items-center gap-1">
             <Button size="sm" variant="ghost" onClick={() => updateAll((c, i) => void (c.delayMs = Math.min(MAX_DELAY_MS, i * cascade)))}>
-              Cascade by
+              {t('Cascade by')}
             </Button>
-            <NumberInput label="Cascade step" value={cascade} onCommit={setCascade} min={0} max={500} step={5} digits={0} unit="ms" />
+            <NumberInput label={t('Cascade step')} value={cascade} onCommit={setCascade} min={0} max={500} step={5} digits={0} unit="ms" />
           </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              const d = channelDefaults()
+              updateAll((c) => Object.assign(c, { delayMs: d.delayMs, attackMs: d.attackMs, releaseMs: d.releaseMs }))
+            }}
+          >
+            {t('Default timing for all')}
+          </Button>
         </div>
       </Group>
-      <Group title="Global">
-        <SliderField label="Sync offset" value={timing.globalDelayMs} onChange={(v) => setTiming('globalDelayMs', v)} min={0} max={1000} step={5} unit="ms" defaultValue={0} hint="Delays every channel, e.g. to line visuals up with Bluetooth speakers." />
-        <SliderField label="Animation speed" value={timing.animationSpeed} onChange={(v) => setTiming('animationSpeed', v)} min={0} max={3} step={0.05} unit="×" defaultValue={1} />
-        <SliderField label="Peak hold" value={audio.peakHoldMs} onChange={(v) => setAudio('peakHoldMs', v)} min={0} max={3000} step={10} unit="ms" />
-        <SliderField label="Peak fall" value={audio.peakDecay} onChange={(v) => setAudio('peakDecay', v)} min={0.05} max={5} step={0.05} unit="/s" />
+      <Group title={t('Global')}>
+        <SliderField
+          label={t('Sync offset')}
+          value={timing.globalDelayMs}
+          onChange={(v) => setTiming('globalDelayMs', v)}
+          min={0}
+          max={1000}
+          step={5}
+          unit="ms"
+          defaultValue={dt.globalDelayMs}
+          hint={t('Delays every channel, e.g. to line visuals up with Bluetooth speakers.')}
+        />
+        <SliderField label={t('Animation speed')} value={timing.animationSpeed} onChange={(v) => setTiming('animationSpeed', v)} min={0} max={3} step={0.05} unit="×" defaultValue={dt.animationSpeed} />
+        <SliderField label={t('Peak hold')} value={audio.peakHoldMs} onChange={(v) => setAudio('peakHoldMs', v)} min={0} max={3000} step={10} unit="ms" defaultValue={da.peakHoldMs} />
+        <SliderField label={t('Peak fall')} value={audio.peakDecay} onChange={(v) => setAudio('peakDecay', v)} min={0.05} max={5} step={0.05} unit="/s" defaultValue={da.peakDecay} />
       </Group>
     </div>
   )
 }
 
 export function BrightnessSection() {
-  const [tone, setTone] = useSettingsGroup('tone')
+  const t = useT()
+  const [tone, setTone, d] = useSettingsGroup('tone')
   const channels = useAppStore((s) => s.settings.channels)
   const updateChannel = useAppStore((s) => s.updateChannel)
   return (
     <div className="flex flex-col gap-5">
-      <Group title="Overall">
-        <SliderField label="Exposure" value={tone.exposure} onChange={(v) => setTone('exposure', v)} min={0.1} max={4} step={0.01} unit="×" defaultValue={1} />
-        <SliderField label="Contrast" value={tone.contrast} onChange={(v) => setTone('contrast', v)} min={0.5} max={2} step={0.01} defaultValue={1.05} />
-        <SliderField label="Saturation" value={tone.saturation} onChange={(v) => setTone('saturation', v)} min={0} max={2} step={0.01} defaultValue={1.05} />
+      <Group title={t('Overall')}>
+        <SliderField label={t('Exposure')} value={tone.exposure} onChange={(v) => setTone('exposure', v)} min={0.1} max={4} step={0.01} unit="×" defaultValue={d.exposure} />
+        <SliderField label={t('Contrast')} value={tone.contrast} onChange={(v) => setTone('contrast', v)} min={0.5} max={2} step={0.01} defaultValue={d.contrast} />
+        <SliderField label={t('Saturation')} value={tone.saturation} onChange={(v) => setTone('saturation', v)} min={0} max={2} step={0.01} defaultValue={d.saturation} />
         <SelectField
-          label="Tone mapping"
+          label={t('Tone mapping')}
           value={tone.toneMapping}
           options={[
-            { value: 'neon', label: 'Neon (keeps hue)' },
-            { value: 'agx', label: 'AgX (filmic)' },
+            { value: 'neon', label: t('Neon (keeps hue)') },
+            { value: 'agx', label: t('AgX (filmic)') },
             { value: 'aces', label: 'ACES' },
             { value: 'reinhard', label: 'Reinhard' },
-            { value: 'none', label: 'None (clip)' },
+            { value: 'none', label: t('None (clip)') },
           ]}
           onChange={(v) => setTone('toneMapping', v)}
         />
       </Group>
-      <Group title="Per channel">
+      <Group title={t('Per channel')}>
         <ChannelTable
-          columns={['Bright', 'Contrast', 'Min', 'Max']}
+          columns={[t('Bright'), t('Contrast'), t('Min'), t('Max')]}
           render={(i) => {
             const ch = channels[i]
             return [
-              <NumberInput key="b" label={`${ch.name} brightness`} value={ch.brightness} onCommit={(v) => updateChannel(ch.id, (c) => void (c.brightness = v))} min={0} max={4} step={0.05} />,
-              <NumberInput key="c" label={`${ch.name} contrast`} value={ch.contrast} onCommit={(v) => updateChannel(ch.id, (c) => void (c.contrast = v))} min={0.1} max={4} step={0.05} />,
-              <NumberInput key="mi" label={`${ch.name} minimum intensity`} value={ch.minIntensity * 100} onCommit={(v) => updateChannel(ch.id, (c) => void (c.minIntensity = Math.min(v / 100, c.maxIntensity)))} min={0} max={100} step={1} digits={0} unit="%" />,
-              <NumberInput key="ma" label={`${ch.name} maximum intensity`} value={ch.maxIntensity * 100} onCommit={(v) => updateChannel(ch.id, (c) => void (c.maxIntensity = Math.max(v / 100, c.minIntensity)))} min={0} max={200} step={1} digits={0} unit="%" />,
+              <NumberInput key="b" label={t('{name} brightness', { name: ch.name })} value={ch.brightness} onCommit={(v) => updateChannel(ch.id, (c) => void (c.brightness = v))} min={0} max={4} step={0.05} />,
+              <NumberInput key="c" label={t('{name} contrast', { name: ch.name })} value={ch.contrast} onCommit={(v) => updateChannel(ch.id, (c) => void (c.contrast = v))} min={0.1} max={4} step={0.05} />,
+              <NumberInput
+                key="mi"
+                label={t('{name} minimum intensity', { name: ch.name })}
+                value={ch.minIntensity * 100}
+                onCommit={(v) => updateChannel(ch.id, (c) => void (c.minIntensity = Math.min(v / 100, c.maxIntensity)))}
+                min={0}
+                max={100}
+                step={1}
+                digits={0}
+                unit="%"
+              />,
+              <NumberInput
+                key="ma"
+                label={t('{name} maximum intensity', { name: ch.name })}
+                value={ch.maxIntensity * 100}
+                onCommit={(v) => updateChannel(ch.id, (c) => void (c.maxIntensity = Math.max(v / 100, c.minIntensity)))}
+                min={0}
+                max={200}
+                step={1}
+                digits={0}
+                unit="%"
+              />,
             ]
           }}
         />
-        <Hint>Contrast steepens each channel's response without moving silence or full scale.</Hint>
+        <Hint>{t("Contrast steepens each channel's response without moving silence or full scale.")}</Hint>
       </Group>
     </div>
   )
 }
 
-type EffectKey = keyof EffectsSettings
-
-interface ParamDef {
-  key: string
-  label: string
-  min: number
-  max: number
-  step: number
-  unit?: string
-  scale?: number
-  type?: 'color'
-}
-
-const EFFECTS: { key: EffectKey; label: string; description: string; params: ParamDef[] }[] = [
-  { key: 'bloom', label: 'Bloom', description: 'Light spills softly around bright shapes.', params: [{ key: 'intensity', label: 'Intensity', min: 0, max: 3, step: 0.01 }, { key: 'threshold', label: 'Threshold', min: 0, max: 2, step: 0.01 }, { key: 'radius', label: 'Radius', min: 0, max: 1, step: 0.01 }] },
-  { key: 'vignette', label: 'Vignette', description: 'Darkens the edges of the frame.', params: [{ key: 'amount', label: 'Amount', min: 0, max: 1, step: 0.01 }, { key: 'softness', label: 'Softness', min: 0.05, max: 1, step: 0.01 }] },
-  { key: 'particles', label: 'Luminous dust', description: 'Drifting particles tinted by the palette.', params: [{ key: 'amount', label: 'Amount', min: 0, max: 1, step: 0.01 }, { key: 'size', label: 'Size', min: 0.2, max: 4, step: 0.05 }, { key: 'speed', label: 'Speed', min: 0, max: 3, step: 0.05 }, { key: 'reactivity', label: 'Reaction', min: 0, max: 2, step: 0.05 }] },
-  { key: 'trails', label: 'Trails', description: 'Shapes leave fading afterimages.', params: [{ key: 'persistence', label: 'Persistence', min: 0, max: 0.98, step: 0.01 }] },
-  { key: 'feedback', label: 'Feedback', description: 'Trails drift, rotate and shift hue.', params: [{ key: 'zoom', label: 'Zoom', min: -0.05, max: 0.05, step: 0.001 }, { key: 'rotation', label: 'Rotation', min: -0.05, max: 0.05, step: 0.001 }, { key: 'hueShift', label: 'Hue drift', min: -0.2, max: 0.2, step: 0.005 }] },
-  { key: 'chromaticAberration', label: 'Chromatic aberration', description: 'Splits color channels toward the edges.', params: [{ key: 'amount', label: 'Amount', min: 0, max: 1, step: 0.01 }, { key: 'reactivity', label: 'Reaction', min: 0, max: 1, step: 0.01 }] },
-  { key: 'grain', label: 'Film grain', description: 'Fine animated grain.', params: [{ key: 'amount', label: 'Amount', min: 0, max: 1, step: 0.01 }] },
-  { key: 'kaleidoscope', label: 'Kaleidoscope', description: 'Folds the image into mirrored segments.', params: [{ key: 'segments', label: 'Segments', min: 2, max: 24, step: 1 }, { key: 'rotationSpeed', label: 'Rotation', min: -1, max: 1, step: 0.01 }] },
-  { key: 'radialDistortion', label: 'Radial distortion', description: 'Lens-like bulge that swells with the bass.', params: [{ key: 'amount', label: 'Amount', min: -1, max: 1, step: 0.01 }, { key: 'reactivity', label: 'Reaction', min: 0, max: 1, step: 0.01 }] },
-  { key: 'waveDistortion', label: 'Wave distortion', description: 'Rippling displacement of the whole frame.', params: [{ key: 'amount', label: 'Amount', min: 0, max: 0.1, step: 0.001 }, { key: 'frequency', label: 'Frequency', min: 0.5, max: 40, step: 0.5 }, { key: 'speed', label: 'Speed', min: 0, max: 5, step: 0.05 }] },
-  { key: 'displacement', label: 'Audio displacement', description: 'Shapes jitter with noise scaled by their energy.', params: [{ key: 'amount', label: 'Amount', min: 0, max: 0.2, step: 0.001 }, { key: 'scale', label: 'Scale', min: 0.5, max: 20, step: 0.1 }] },
-  { key: 'pulse', label: 'Pulse', description: 'Everything breathes outward with the bass.', params: [{ key: 'amount', label: 'Amount', min: 0, max: 0.3, step: 0.005 }] },
-  { key: 'shockwave', label: 'Shockwaves', description: 'Strong bass beats send a ripple through the frame.', params: [{ key: 'strength', label: 'Strength', min: 0, max: 1, step: 0.01 }, { key: 'speed', label: 'Speed', min: 0.2, max: 4, step: 0.05 }] },
-  { key: 'beatFlash', label: 'Beat flash', description: 'A brief wash of light on each beat.', params: [{ key: 'intensity', label: 'Intensity', min: 0, max: 1, step: 0.01 }, { key: 'color', label: 'Color', min: 0, max: 0, step: 0, type: 'color' }] },
-  { key: 'camera', label: 'Camera motion', description: 'A slow drift around the scene.', params: [{ key: 'motion', label: 'Range', min: 0, max: 1, step: 0.01 }, { key: 'speed', label: 'Speed', min: 0, max: 2, step: 0.01 }, { key: 'tilt', label: 'Tilt', min: 0, max: 1, step: 0.01 }] },
-  { key: 'parallax', label: 'Depth and parallax', description: 'Spreads particles in depth so camera motion has parallax.', params: [{ key: 'depth', label: 'Depth', min: 0, max: 1, step: 0.01 }] },
-]
-
 export function EffectsSection() {
+  const t = useT()
   const effects = useAppStore((s) => s.settings.effects)
   const update = useAppStore((s) => s.update)
+  const defaults = factoryDefaults().effects
   const setFx = (key: EffectKey, field: string, value: unknown) =>
     update((s) => {
       ;(s.effects[key] as Record<string, unknown>)[field] = value
@@ -366,19 +421,32 @@ export function EffectsSection() {
 
   return (
     <div className="flex flex-col gap-2">
-      <Hint className="mb-2">{enabledCount} of {EFFECTS.length} effects on. Effects respect reduced motion: movement-based ones hold still when it is enabled.</Hint>
+      <Hint className="mb-2">
+        {t('{count} of {total} effects on. Effects respect reduced motion: movement-based ones hold still when it is enabled.', { count: enabledCount, total: EFFECTS.length })}
+      </Hint>
       {EFFECTS.map((e) => {
         const fx = effects[e.key] as Record<string, unknown> & { enabled: boolean }
+        const def = defaults[e.key] as Record<string, unknown>
         return (
           <div key={e.key} className={cn('rounded-[12px] border px-3.5 py-3 transition-colors', fx.enabled ? 'border-line-strong bg-graphite-900/60' : 'border-line')} data-testid={`effect-${e.key}`}>
-            <SwitchField label={e.label} description={e.description} checked={fx.enabled} onChange={(v) => setFx(e.key, 'enabled', v)} testId={`effect-toggle-${e.key}`} />
+            <SwitchField label={t(e.label)} description={t(e.description)} checked={fx.enabled} onChange={(v) => setFx(e.key, 'enabled', v)} testId={`effect-toggle-${e.key}`} />
             {fx.enabled && (
               <div className="mt-3.5 flex flex-col gap-3">
                 {e.params.map((p) =>
                   p.type === 'color' ? (
-                    <ColorField key={p.key} label={p.label} value={fx[p.key] as string} onChange={(v) => setFx(e.key, p.key, v)} />
+                    <ColorField key={p.key} label={t(p.label)} value={fx[p.key] as string} onChange={(v) => setFx(e.key, p.key, v)} />
                   ) : (
-                    <SliderField key={p.key} label={p.label} value={fx[p.key] as number} onChange={(v) => setFx(e.key, p.key, v)} min={p.min} max={p.max} step={p.step} unit={p.unit} />
+                    <SliderField
+                      key={p.key}
+                      label={t(p.label)}
+                      value={fx[p.key] as number}
+                      onChange={(v) => setFx(e.key, p.key, v)}
+                      min={p.min}
+                      max={p.max}
+                      step={p.step}
+                      unit={p.unit}
+                      defaultValue={def[p.key] as number}
+                    />
                   ),
                 )}
               </div>
@@ -393,13 +461,14 @@ export function EffectsSection() {
 function LiveStats() {
   const ref = useRef<HTMLSpanElement>(null)
   useLiveFrame((live) => {
-    if (ref.current) ref.current.textContent = `${live.fps.toFixed(0)} fps · ${live.widthPx}×${live.heightPx} · scale ${live.resolutionScale.toFixed(2)}`
+    if (ref.current) ref.current.textContent = `${live.fps.toFixed(0)} fps · ${live.widthPx}×${live.heightPx} · ${live.resolutionScale.toFixed(2)}×`
   })
   return <span ref={ref} className="num text-xs text-ink-muted" />
 }
 
 export function PerformanceSection() {
-  const [perf, set] = useSettingsGroup('performance')
+  const t = useT()
+  const [perf, set, d] = useSettingsGroup('performance')
   const setProfile = useAppStore((s) => s.setPerformanceProfile)
   const custom = <K extends keyof Settings['performance']>(k: K, v: Settings['performance'][K]) => {
     set(k, v)
@@ -407,45 +476,63 @@ export function PerformanceSection() {
   }
   return (
     <div className="flex flex-col gap-5">
-      <Group title="Profile" aside={<LiveStats />}>
+      <Group title={t('Profile')} aside={<LiveStats />}>
         <SegmentedField
-          label="Quality"
+          label={t('Quality')}
           value={perf.profile === 'custom' ? ('custom' as const) : perf.profile}
           options={[
-            { value: 'quality', label: 'Quality' },
-            { value: 'balanced', label: 'Balanced' },
-            { value: 'performance', label: 'Performance' },
-            ...(perf.profile === 'custom' ? [{ value: 'custom' as const, label: 'Custom' }] : []),
+            { value: 'quality', label: t('Quality') },
+            { value: 'balanced', label: t('Balanced') },
+            { value: 'performance', label: t('Performance') },
+            ...(perf.profile === 'custom' ? [{ value: 'custom' as const, label: t('Custom') }] : []),
           ]}
           onChange={(v) => setProfile(v)}
           testIdPrefix="profile"
         />
-        <Hint>Performance keeps phones cool: lower resolution, fewer particles and a lighter bloom.</Hint>
+        <Hint>{t('Performance keeps phones cool: lower resolution, fewer particles and a lighter bloom.')}</Hint>
       </Group>
-      <Group title="Resolution">
-        <SliderField label="Max pixel ratio" value={perf.maxPixelRatio} onChange={(v) => custom('maxPixelRatio', v)} min={0.5} max={3} step={0.05} unit="×" />
-        <SwitchField label="Adaptive resolution" description="Lowers resolution when frames run slow" checked={perf.adaptiveResolution} onChange={(v) => custom('adaptiveResolution', v)} />
-        <SliderField label="Lowest scale" value={perf.minResolutionScale * 100} onChange={(v) => custom('minResolutionScale', v / 100)} min={30} max={100} step={1} unit="%" disabled={!perf.adaptiveResolution} />
-        <SwitchField label="Multisample antialiasing" checked={perf.msaa} onChange={(v) => custom('msaa', v)} />
+      <Group title={t('Resolution')}>
+        <SliderField label={t('Max pixel ratio')} value={perf.maxPixelRatio} onChange={(v) => custom('maxPixelRatio', v)} min={0.5} max={3} step={0.05} unit="×" defaultValue={d.maxPixelRatio} />
+        <SwitchField label={t('Adaptive resolution')} description={t('Lowers resolution when frames run slow')} checked={perf.adaptiveResolution} onChange={(v) => custom('adaptiveResolution', v)} />
+        <SliderField
+          label={t('Lowest scale')}
+          value={perf.minResolutionScale * 100}
+          onChange={(v) => custom('minResolutionScale', v / 100)}
+          min={30}
+          max={100}
+          step={1}
+          unit="%"
+          defaultValue={d.minResolutionScale * 100}
+          disabled={!perf.adaptiveResolution}
+        />
+        <SwitchField label={t('Multisample antialiasing')} checked={perf.msaa} onChange={(v) => custom('msaa', v)} />
       </Group>
-      <Group title="Detail">
-        <SliderField label="Bloom levels" value={perf.bloomLevels} onChange={(v) => custom('bloomLevels', v)} min={2} max={7} step={1} />
-        <SegmentedField label="Bloom resolution" value={perf.bloomResolution} options={[{ value: 'half', label: 'Half' }, { value: 'quarter', label: 'Quarter' }]} onChange={(v) => custom('bloomResolution', v)} />
-        <SliderField label="Particle budget" value={perf.particleBudget} onChange={(v) => custom('particleBudget', v)} min={0} max={20000} step={100} />
-        <SliderField label="Geometry detail" value={perf.geometryDetail} onChange={(v) => custom('geometryDetail', v)} min={0.25} max={2} step={0.05} unit="×" />
+      <Group title={t('Detail')}>
+        <SliderField label={t('Bloom levels')} value={perf.bloomLevels} onChange={(v) => custom('bloomLevels', v)} min={2} max={7} step={1} defaultValue={d.bloomLevels} />
+        <SegmentedField
+          label={t('Bloom resolution')}
+          value={perf.bloomResolution}
+          options={[
+            { value: 'half', label: t('Half') },
+            { value: 'quarter', label: t('Quarter') },
+          ]}
+          onChange={(v) => custom('bloomResolution', v)}
+        />
+        <SliderField label={t('Particle budget')} value={perf.particleBudget} onChange={(v) => custom('particleBudget', v)} min={0} max={20000} step={100} defaultValue={d.particleBudget} />
+        <SliderField label={t('Geometry detail')} value={perf.geometryDetail} onChange={(v) => custom('geometryDetail', v)} min={0.25} max={2} step={0.05} unit="×" defaultValue={d.geometryDetail} />
       </Group>
-      <Group title="Comfort">
+      <Group title={t('Comfort')}>
         <SelectField
-          label="Reduced motion"
+          label={t('Reduced motion')}
           value={perf.reducedMotion}
           options={[
-            { value: 'system', label: 'Follow system' },
-            { value: 'on', label: 'Always on' },
-            { value: 'off', label: 'Off' },
+            { value: 'system', label: t('Follow system') },
+            { value: 'on', label: t('Always on') },
+            { value: 'off', label: t('Off') },
           ]}
           onChange={(v) => set('reducedMotion', v)}
         />
-        <SwitchField label="Show frame stats" checked={perf.showStats} onChange={(v) => set('showStats', v)} />
+        <SwitchField label={t('Show frame stats')} checked={perf.showStats} onChange={(v) => set('showStats', v)} />
       </Group>
     </div>
   )

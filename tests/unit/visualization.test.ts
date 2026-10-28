@@ -134,3 +134,42 @@ describe('adjustable geometry', () => {
     expect(instanceCount(viz.root)).toBe(11)
   })
 })
+
+describe('ring styles', () => {
+  const ringsWith = (patch: Partial<Settings['rings']>) => {
+    const s = createDefaultSettings()
+    s.rings = { ...s.rings, count: 10, center: 'none', peakRings: false, ...patch }
+    return s
+  }
+
+  it('draws filled bands between rings, plus a centre fill and an outer edge', () => {
+    const viz = VISUALIZATION_FACTORIES.rings()
+    viz.update(context(ringsWith({ style: 'touching' })))
+    expect(instanceCount(viz.root)).toBe(11)
+    viz.dispose()
+  })
+
+  it('adds thin outlines over merged bands when enabled', () => {
+    const viz = VISUALIZATION_FACTORIES.rings()
+    viz.update(context(ringsWith({ style: 'merged', outline: true })))
+    expect(instanceCount(viz.root)).toBe(11 + 10)
+    viz.update(context(ringsWith({ style: 'merged', outline: false })))
+    expect(instanceCount(viz.root)).toBe(11)
+    viz.update(context(ringsWith({ style: 'lines' })))
+    expect(instanceCount(viz.root)).toBe(10)
+    viz.dispose()
+  })
+})
+
+describe('LED bars', () => {
+  it('fills the screen with round LEDs: rows follow the column count and aspect ratio', () => {
+    const viz = VISUALIZATION_FACTORIES.bars()
+    const s = createDefaultSettings()
+    s.bars = { ...s.bars, style: 'leds', columns: 40, mirror: 'none', peakMarkers: true }
+    viz.update(context(s))
+    // 1.6:1 area at 0.98 × 0.96 of the view → about 40 × 0.96 / (0.98 × 1.6) ≈ 24 rows.
+    const rows = Math.round((2 * 0.96) / ((3.2 * 0.98) / 40))
+    expect(instanceCount(viz.root)).toBe(40 * rows)
+    viz.dispose()
+  })
+})

@@ -1,6 +1,7 @@
 uniform float uPixel;
 uniform float uPeakPass;
 uniform float uGlowNorm;
+uniform float uLineGain;
 
 varying float vSide;
 varying float vHalfCore;
@@ -31,5 +32,5 @@ void main() {
   }
   vec3 emission = hot * core * coreLum + vGlowColor * glow * glowLum;
   float alpha = clamp(max(core * vCoreFade, glow * 0.6), 0.0, 1.0) * vAlpha;
-  gl_FragColor = vec4(emission * vAlpha, alpha * (1.0 - vAdd));
+  gl_FragColor = vec4(emission * vAlpha * uLineGain, alpha * uLineGain * (1.0 - vAdd));
 }

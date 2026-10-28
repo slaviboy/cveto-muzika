@@ -40,6 +40,11 @@
 }
 
 @layer base {
+  /* Instrument Sans has no Cyrillic, so Bulgarian uses Onest, drawn for Cyrillic and Latin alike. */
+  :root[lang='bg'] {
+    --font-sans: 'Onest Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+
   html,
   body,
   #root {

@@ -17,11 +17,15 @@ export function App() {
   const floating = useAppStore((s) => s.ui.floatingEditor)
   const shortcutsOpen = useAppStore((s) => s.ui.shortcutsOpen)
   const uiHidden = useAppStore((s) => s.ui.uiHidden)
+  const locale = useAppStore((s) => s.locale)
   const setUi = useAppStore((s) => s.setUi)
   const running = status === 'live' || status === 'demo'
   const fullscreen = useFullscreen()
 
   useEffect(() => wireEngine(), [])
+  useEffect(() => {
+    document.documentElement.lang = locale
+  }, [locale])
   useEffect(() => {
     if (running) setUi({ startedOnce: true })
   }, [running, setUi])

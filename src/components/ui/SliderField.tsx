@@ -1,5 +1,7 @@
 import { Slider } from 'radix-ui'
+import { RotateCcw } from 'lucide-react'
 import { useId, useState, type KeyboardEvent } from 'react'
+import { useT } from '../../i18n/useT'
 import { cn } from '../../utils/cn'
 import { formatNumber, roundTo, stepDecimals } from '../../utils/format'
 
@@ -75,6 +77,29 @@ export function NumberInput({
   )
 }
 
+/** Small "back to default" button shown next to a control whose value was changed. */
+export function ResetValueButton({ onReset, label, visible }: { onReset: () => void; label: string; visible: boolean }) {
+  const t = useT()
+  return (
+    <button
+      type="button"
+      onClick={onReset}
+      aria-label={t('Reset {label} to default', { label })}
+      title={t('Reset to default')}
+      tabIndex={visible ? 0 : -1}
+      aria-hidden={!visible}
+      className={cn(
+        'flex size-6 shrink-0 items-center justify-center rounded-md text-ink-faint transition-opacity hover:bg-white/[0.07] hover:text-ink pointer-coarse:size-8',
+        visible ? 'opacity-100' : 'pointer-events-none opacity-0',
+      )}
+    >
+      <RotateCcw size={12} />
+    </button>
+  )
+}
+
+const differs = (a: number, b: number) => Math.abs(a - b) > 1e-6 * Math.max(1, Math.abs(b))
+
 export interface SliderFieldProps {
   label: string
   value: number
@@ -93,7 +118,7 @@ export interface SliderFieldProps {
 
 const LOG_STEPS = 1000
 
-/** Slider + precise numeric input. Double-click the label to restore the default. */
+/** Slider + precise numeric input, with a reset button once the value differs from its default. */
 export function SliderField({
   label,
   value,
@@ -110,21 +135,25 @@ export function SliderField({
   disabled,
 }: SliderFieldProps) {
   const id = useId()
+  const t = useT()
   const log = scale === 'log' && min > 0
-  const toSlider = (v: number) => (log ? (Math.log(v / min) / Math.log(max / min)) * LOG_STEPS : v)
+  const toSlider = (v: number) => (log ? (Math.log(Math.max(v, min) / min) / Math.log(max / min)) * LOG_STEPS : v)
   const fromSlider = (x: number) => (log ? min * Math.pow(max / min, x / LOG_STEPS) : x)
   const set = (v: number) => onChange(roundTo(Math.min(max, Math.max(min, v)), step))
+  const resettable = defaultValue !== undefined
+  const changed = resettable && differs(value, defaultValue)
   return (
     <div className={cn('flex flex-col gap-1', disabled && 'pointer-events-none opacity-40')}>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-2">
         <label
           htmlFor={id}
-          className="min-w-0 select-none truncate text-xs text-ink-muted"
-          title={hint ?? (defaultValue !== undefined ? 'Double-click to reset' : undefined)}
-          onDoubleClick={() => defaultValue !== undefined && onChange(defaultValue)}
+          className="min-w-0 flex-1 select-none truncate text-xs text-ink-muted"
+          title={hint ?? (resettable ? t('Double-click to reset') : undefined)}
+          onDoubleClick={() => resettable && onChange(defaultValue)}
         >
           {label}
         </label>
+        {resettable && <ResetValueButton label={label} visible={changed} onReset={() => onChange(defaultValue)} />}
         <NumberInput id={id} value={value} onCommit={set} min={min} max={max} step={step} digits={digits} unit={unit} testId={testId} />
       </div>
       <Slider.Root
@@ -158,6 +187,8 @@ export function RangeField({
   max,
   unit = 'Hz',
   testId,
+  defaultLow,
+  defaultHigh,
 }: {
   label: string
   low: number
@@ -167,16 +198,24 @@ export function RangeField({
   max: number
   unit?: string
   testId?: string
+  defaultLow?: number
+  defaultHigh?: number
 }) {
+  const t = useT()
   const toSlider = (v: number) => (Math.log(Math.max(min, v) / min) / Math.log(max / min)) * LOG_STEPS
   const fromSlider = (x: number) => Math.round(min * Math.pow(max / min, x / LOG_STEPS) * 10) / 10
+  const resettable = defaultLow !== undefined && defaultHigh !== undefined
+  const changed = resettable && (differs(low, defaultLow) || differs(high, defaultHigh))
+  const minLabel = t('{label} minimum', { label })
+  const maxLabel = t('{label} maximum', { label })
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-ink-muted">{label}</span>
+        <span className="min-w-0 flex-1 truncate text-xs text-ink-muted">{label}</span>
+        {resettable && <ResetValueButton label={label} visible={changed} onReset={() => onChange(defaultLow, defaultHigh)} />}
         <span className="flex items-center gap-1">
           <NumberInput
-            label={`${label} minimum`}
+            label={minLabel}
             testId={testId ? `${testId}-min` : undefined}
             value={low}
             onCommit={(v) => onChange(Math.min(v, high - 1), high)}
@@ -187,7 +226,7 @@ export function RangeField({
           />
           <span className="text-ink-faint">–</span>
           <NumberInput
-            label={`${label} maximum`}
+            label={maxLabel}
             testId={testId ? `${testId}-max` : undefined}
             value={high}
             onCommit={(v) => onChange(low, Math.max(v, low + 1))}
@@ -211,8 +250,8 @@ export function RangeField({
         <Slider.Track className="relative h-[3px] grow overflow-hidden rounded-full bg-graphite-600">
           <Slider.Range className="absolute h-full rounded-full bg-ice/60" />
         </Slider.Track>
-        <Slider.Thumb aria-label={`${label} minimum`} className="block size-3.5 rounded-full border-2 border-void bg-ice pointer-coarse:size-5" />
-        <Slider.Thumb aria-label={`${label} maximum`} className="block size-3.5 rounded-full border-2 border-void bg-ice pointer-coarse:size-5" />
+        <Slider.Thumb aria-label={minLabel} className="block size-3.5 rounded-full border-2 border-void bg-ice pointer-coarse:size-5" />
+        <Slider.Thumb aria-label={maxLabel} className="block size-3.5 rounded-full border-2 border-void bg-ice pointer-coarse:size-5" />
       </Slider.Root>
     </div>
   )

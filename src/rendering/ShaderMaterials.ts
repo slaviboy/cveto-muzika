@@ -1,5 +1,8 @@
 import * as THREE from 'three'
 import common from './shaders/common.glsl?raw'
+import ring from './shaders/ring.glsl?raw'
+import bandVert from './shaders/band.vert.glsl?raw'
+import bandFrag from './shaders/band.frag.glsl?raw'
 import stripVert from './shaders/strip.vert.glsl?raw'
 import stripFrag from './shaders/strip.frag.glsl?raw'
 import cellVert from './shaders/cell.vert.glsl?raw'
@@ -28,42 +31,69 @@ function premultipliedBlend(material: THREE.ShaderMaterial) {
 
 const u = <T>(value: T) => ({ value })
 
+/** Uniforms declared by ring.glsl, shared by the line and band shaders. */
+function ringUniforms(spectrum: THREE.Texture, lut: THREE.Texture) {
+  return {
+    uTime: u(0),
+    uScale: u(1),
+    uPixel: u(0.002),
+    uRotation: u(0),
+    uShape: u(0),
+    uMirror: u(0),
+    uDistortion: u(0),
+    uLobes: u(0),
+    uDistPhase: u(0),
+    uSpectrumWarp: u(0),
+    uSpectrum: u(spectrum),
+    uRadiusReact: u(0),
+    uPulse: u(0),
+    uDisplace: u(0),
+    uDisplaceScale: u(4),
+    uColorStyle: u(0),
+    uLut: u(lut),
+    uEnergyMix: u(0),
+  }
+}
+
 export function createStripMaterial(spectrum: THREE.Texture, lut: THREE.Texture) {
   return premultipliedBlend(
     new THREE.ShaderMaterial({
-      vertexShader: common + stripVert,
+      vertexShader: common + ring + stripVert,
       fragmentShader: common + stripFrag,
       uniforms: {
-        uTime: u(0),
-        uScale: u(1),
-        uPixel: u(0.002),
-        uRotation: u(0),
-        uShape: u(0),
-        uMirror: u(0),
-        uDistortion: u(0),
-        uLobes: u(0),
-        uDistPhase: u(0),
-        uSpectrumWarp: u(0),
-        uSpectrum: u(spectrum),
-        uRadiusReact: u(0),
+        ...ringUniforms(spectrum, lut),
         uThickReact: u(0),
         uOpacityReact: u(0),
         uGlowWidth: u(0),
-        uColorStyle: u(0),
-        uLut: u(lut),
-        uEnergyMix: u(0),
         uGlowTint: u(0),
         uPeakPass: u(0),
         uGlowNorm: u(1),
-        uDisplace: u(0),
-        uDisplaceScale: u(4),
-        uPulse: u(0),
+        uLineGain: u(1),
       },
     }),
   )
 }
 
 export type StripMaterial = ReturnType<typeof createStripMaterial>
+
+/** Filled bands between neighbouring rings ("touching" and "merged" ring styles). */
+export function createBandMaterial(spectrum: THREE.Texture, lut: THREE.Texture) {
+  return premultipliedBlend(
+    new THREE.ShaderMaterial({
+      vertexShader: common + ring + bandVert,
+      fragmentShader: common + bandFrag,
+      uniforms: {
+        ...ringUniforms(spectrum, lut),
+        uBandMode: u(1),
+        uGap: u(0.1),
+        uBandGain: u(1),
+        uOpacityReact: u(0),
+      },
+    }),
+  )
+}
+
+export type BandMaterial = ReturnType<typeof createBandMaterial>
 
 export function createCellMaterial() {
   return premultipliedBlend(

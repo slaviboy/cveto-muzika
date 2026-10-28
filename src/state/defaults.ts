@@ -1,3 +1,4 @@
+import type { Locale } from '../i18n'
 import { defaultChannels } from './channelOps'
 import { SettingsSchema, type PerformanceProfile, type PerformanceSettings, type Settings } from './settingsSchema'
 
@@ -50,8 +51,8 @@ export function performanceDefaults(profile: Exclude<PerformanceProfile, 'custom
   return { ...SettingsSchema.shape.performance.parse({}), ...PERFORMANCE_PROFILES[profile], profile }
 }
 
-export function createDefaultSettings(profile: Exclude<PerformanceProfile, 'custom'> = 'balanced'): Settings {
-  const settings = SettingsSchema.parse({ channels: defaultChannels() })
+export function createDefaultSettings(profile: Exclude<PerformanceProfile, 'custom'> = 'balanced', locale: Locale = 'en'): Settings {
+  const settings = SettingsSchema.parse({ channels: defaultChannels(locale) })
   settings.performance = performanceDefaults(profile)
   return settings
 }

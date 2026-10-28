@@ -4,6 +4,7 @@ import { toHex } from '../../color/colorMath'
 import { gradientCss, sampleGradient, sortStops, type GradientStop } from '../../color/gradient'
 import type { InterpolationSpace } from '../../color/colorMath'
 import { ColorField } from './ColorField'
+import { useT } from '../../i18n/useT'
 import { IconButton } from './primitives'
 import { SliderField } from './SliderField'
 
@@ -20,6 +21,7 @@ export function GradientEditor({
   onChange: (stops: GradientStop[]) => void
   space?: InterpolationSpace
 }) {
+  const t = useT()
   const barRef = useRef<HTMLDivElement>(null)
   const [selected, setSelected] = useState(0)
   const dragging = useRef<number | null>(null)
@@ -80,13 +82,13 @@ export function GradientEditor({
         onPointerDown={onBarPointerDown}
         className="relative h-9 cursor-copy rounded-[10px] border border-line-strong"
         style={{ background: gradientCss(preview) }}
-        aria-label="Gradient. Click to add a color stop."
+        aria-label={t('Gradient. Click to add a color stop.')}
       >
         {stops.map((s, i) => (
           <button
             key={i}
             type="button"
-            aria-label={`Color stop ${i + 1} at ${Math.round(s.position * 100)}%`}
+            aria-label={t('Color stop {n} at {pct}%', { n: i + 1, pct: Math.round(s.position * 100) })}
             onPointerDown={onStopPointerDown(i)}
             onPointerMove={onStopPointerMove}
             onPointerUp={() => (dragging.current = null)}
@@ -105,7 +107,7 @@ export function GradientEditor({
         <div className="flex items-end gap-2">
           <div className="min-w-0 flex-1">
             <SliderField
-              label={`Stop ${sel + 1} position`}
+              label={t('Stop {n} position', { n: sel + 1 })}
               value={stops[sel].position * 100}
               onChange={(v) => update(sel, { position: v / 100 })}
               min={0}
@@ -114,9 +116,9 @@ export function GradientEditor({
               unit="%"
             />
           </div>
-          <ColorField compact label={`Stop ${sel + 1} color`} value={stops[sel].color} onChange={(color) => update(sel, { color })} />
+          <ColorField compact label={t('Stop {n} color', { n: sel + 1 })} value={stops[sel].color} onChange={(color) => update(sel, { color })} />
           <IconButton
-            label="Remove stop"
+            label={t('Remove stop')}
             disabled={stops.length <= 2}
             onClick={() => {
               onChange(stops.filter((_, i) => i !== sel))
@@ -132,7 +134,7 @@ export function GradientEditor({
         className="self-start text-2xs text-ink-faint underline-offset-2 hover:text-ink hover:underline"
         onClick={() => onChange(sortStops(stops).map((s, i, arr) => ({ ...s, position: arr.length > 1 ? i / (arr.length - 1) : 0 })))}
       >
-        Space stops evenly
+        {t('Space stops evenly')}
       </button>
     </div>
   )
