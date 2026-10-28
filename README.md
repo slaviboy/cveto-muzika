@@ -4,6 +4,8 @@ A real-time music visualizer for the browser. Aurora listens to the microphone (
 
 Audio is analyzed locally. Nothing is recorded, stored or uploaded.
 
+**Live:** https://slaviboy.github.io/cveto-muzika/
+
 ## Running it
 
 Requires Node 20+ (developed on Node 26) and a browser with WebGL2.
@@ -26,6 +28,10 @@ npm run build        # type-checks, then bundles to dist/
 npm run preview      # serves dist/ on http://localhost:4173
 ```
 
+## Deployment
+
+`.github/workflows/deploy.yml` runs on every pull request and push to `main`: install, type-check, lint, unit tests and a production build. Pushes to `main` are then published to GitHub Pages. Project pages are served from `/<repository>/`, so the workflow builds with `--base "/<repository>/"`; local builds keep `/`. GitHub Pages is HTTPS, so the microphone works there, including on phones.
+
 ## Scripts
 
 | Script | What it does |
@@ -43,6 +49,21 @@ The first e2e run needs `npx playwright install chromium`. The tests build the a
 ## Keyboard
 
 `Space` starts or stops the microphone, `D` plays the demo, `1`–`4` switch modes, `S` toggles settings, `F` toggles fullscreen, `H` hides the interface, `?` lists the shortcuts.
+
+## Modes and options
+
+- **Rings** come in three styles. *Lines* are thin luminous rings. *Touching* rings are filled and meet at the midpoints between their centers, one color per ring, with an adjustable gap. *Merged* rings blend color and brightness continuously from one ring center to the next, so the color follows the distance from the center. Filled styles use a band shader that shares its geometry functions with the line shader (`rendering/shaders/ring.glsl`), so neighboring bands meet exactly even while the rings distort.
+- **LED rings**: concentric rows of LEDs, one band per row or every LED mixing bands. They don't rotate by default.
+- **Bars**: segmented or continuous equalizer, a full-screen light wall, or *LED bars*: round LEDs filling the screen, rising with each band, with the peak held as a lit LED. LED rows follow the column count, so the LEDs stay round at any aspect ratio.
+- **Squares**: concentric, nested, LED matrix, tiles or expanding waves.
+- **Background**: static by default. *Background visuals* (Colors → Background) turns on floating particles, and *Breathes with bass* animates the gradient.
+- **Reset**: every slider shows a reset button once its value differs from the default, and every settings section ends with *Reset this section to defaults*. *Presets → Reset all settings* starts over.
+
+## Languages
+
+The interface is available in English and Bulgarian. Switch it on the start screen, from the language menu in the toolbar (desktop), or with the language button at the bottom of the settings rail (also in the mobile sheet). The first visit follows the browser language.
+
+Strings are keyed by their English source text (`src/i18n`), and Bulgarian lives in `src/i18n/bg.ts`. A unit test scans the source for every `t('…')` call and every data label, and fails if a translation is missing, a placeholder was dropped, or an entry is stale. Generated channel names ("Bass", "Mids 2") follow the language when you switch; names you typed stay as they are. Bulgarian text uses the Onest variable font, because Instrument Sans has no Cyrillic.
 
 ## How it works
 
@@ -82,6 +103,7 @@ src/
   components/     ui/ primitives, audio/ start screen and meters, settings/ panel + 11 sections,
                   visualizer/ canvas host, toolbar, overlays
   hooks/          live-frame reader, fullscreen, idle hide, wake lock, media queries
+  i18n/           translate(), useT(), Bulgarian dictionary
   presets/        Built-in presets and preset file import/export
   rendering/      Renderer, PerformanceMonitor, shader materials, GLSL
   state/          Zod schema, defaults, Zustand store, persistence, migrations, channel operations
@@ -93,12 +115,12 @@ tests/e2e         Playwright
 
 ## Presets
 
-Built-in looks: Aurora, Three-band RGB, Six-band spectrum, Eight-band rainbow, Deep/warm/bright, Deep spectrum (20–80 / 80–250 / 250–1000 / 1000–4000 / 4000–12000 Hz), LED installation, Light wall, Neon equalizer, Square pulse, Square waves, Kaleidoscope, Tunnel.
+Built-in looks: Aurora, Merged rings, Touching rings, Three-band RGB, Six-band spectrum, Eight-band rainbow, Deep/warm/bright, Deep spectrum (20–80 / 80–250 / 250–1000 / 1000–4000 / 4000–12000 Hz), LED installation, Light wall, LED bars, Neon equalizer, Square pulse, Square waves, Kaleidoscope, Tunnel.
 
 Preset files are JSON:
 
 ```json
-{ "format": "aurora-preset", "formatVersion": 1, "settingsVersion": 1, "name": "…", "createdAt": "…", "settings": { … } }
+{ "format": "aurora-preset", "formatVersion": 1, "settingsVersion": 2, "name": "…", "createdAt": "…", "settings": { … } }
 ```
 
 They contain the look only. Device-specific settings (performance profile, selected microphone, demo volume) are left out on export and kept on import.
@@ -111,5 +133,5 @@ They contain the look only. Device-specific settings (performance profile, selec
 - The Canvas 2D fallback for browsers without WebGL2 draws simplified rings and bars only.
 - Up to 32 channels. Per-channel delays go up to 3 s, plus up to 1 s of global sync offset.
 - After a WebGL context loss the renderer is rebuilt, which shows a brief notice.
-- The settings schema is at version 1. The migration pipeline exists and is tested, but no migrations have been needed yet.
+- Settings are at schema version 2. The v1 → v2 migration moves values still at the old defaults (LED rotation, background particles, bass breathing) to the new ones and keeps anything you changed.
 - The main bundle is about 750 kB (230 kB gzipped). Three.js is split into its own chunk; the settings UI is not lazy-loaded yet.

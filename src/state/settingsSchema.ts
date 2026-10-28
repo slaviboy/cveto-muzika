@@ -87,6 +87,12 @@ export const TimingSchema = z.object({
 
 export const RingsSchema = z.object({
   count: int(1, 128, 24),
+  /** lines: thin luminous rings; touching: filled rings meeting at their midpoints; merged: colors blend continuously between ring centres. */
+  style: pick(['lines', 'touching', 'merged'], 'lines'),
+  bandGap: num(0, 0.6, 0.1),
+  bandBrightness: num(0.1, 2, 1),
+  fillCenter: bool(true),
+  outline: bool(true),
   assignment: pick(['grouped', 'perChannel', 'cycled', 'spectrum'], 'grouped'),
   radiusSource: pick(['auto', 'channel'], 'auto'),
   innerRadius: num(0, 0.95, 0.16),
@@ -126,7 +132,7 @@ export const LedsSchema = z.object({
   mixSpread: num(0.05, 3, 0.6),
   pulseWaves: bool(true),
   pulseSpeedMs: num(10, 200, 45),
-  rotationSpeed: num(-2, 2, 0.04),
+  rotationSpeed: num(-2, 2, 0),
   alternateRotation: bool(true),
   rainbow: num(0, 1, 0),
   unlitLevel: num(0, 0.3, 0.045),
@@ -134,7 +140,7 @@ export const LedsSchema = z.object({
 })
 
 export const BarsSchema = z.object({
-  style: pick(['equalizer', 'lightwall'], 'equalizer'),
+  style: pick(['equalizer', 'lightwall', 'leds'], 'equalizer'),
   orientation: pick(['vertical', 'horizontal'], 'vertical'),
   rows: int(1, 64, 18),
   columns: int(1, 256, 48),
@@ -198,7 +204,7 @@ export const BackgroundSchema = z.object({
   colorA: hex('#070912'),
   colorB: hex('#010103'),
   angle: num(0, 360, 90),
-  reactivity: num(0, 1, 0.2),
+  reactivity: num(0, 1, 0),
 })
 
 export const ToneSchema = z.object({
@@ -220,7 +226,7 @@ export const EffectsSchema = z.object({
   radialDistortion: effect(false, { amount: num(-1, 1, 0.18), reactivity: num(0, 1, 0.5) }),
   waveDistortion: effect(false, { amount: num(0, 0.1, 0.012), frequency: num(0.5, 40, 9), speed: num(0, 5, 0.8) }),
   kaleidoscope: effect(false, { segments: int(2, 24, 6), rotationSpeed: num(-1, 1, 0.05) }),
-  particles: effect(true, { amount: num(0, 1, 0.35), size: num(0.2, 4, 1.1), speed: num(0, 3, 0.5), reactivity: num(0, 2, 0.8) }),
+  particles: effect(false, { amount: num(0, 1, 0.35), size: num(0.2, 4, 1.1), speed: num(0, 3, 0.5), reactivity: num(0, 2, 0.8) }),
   displacement: effect(false, { amount: num(0, 0.2, 0.025), scale: num(0.5, 20, 4) }),
   pulse: effect(false, { amount: num(0, 0.3, 0.05) }),
   camera: effect(false, { motion: num(0, 1, 0.35), speed: num(0, 2, 0.25), tilt: num(0, 1, 0.3) }),

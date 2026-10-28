@@ -80,6 +80,16 @@ export function mergePresetIntoSettings(current: Settings, preset: unknown): { s
   return parseSettings(merged)
 }
 
+/** User-facing import messages (English source text, translated by the UI). */
+export const PRESET_MESSAGES = {
+  invalidJson: 'This file is not valid JSON.',
+  notPreset: 'This file does not contain an Aurora preset.',
+  noSettings: 'The preset has no settings.',
+  newer: 'This preset was made with a newer version of Aurora. Unknown options were skipped.',
+  newerShort: 'This preset was made with a newer version of Aurora.',
+  rawSettings: 'The file had no preset header; it was read as raw settings.',
+} as const
+
 export type ImportResult =
   | { ok: true; name: string; settings: Settings; warnings: string[] }
   | { ok: false; error: string }
@@ -89,9 +99,9 @@ export function parsePresetText(text: string, current: Settings): ImportResult {
   try {
     data = JSON.parse(text)
   } catch {
-    return { ok: false, error: 'This file is not valid JSON.' }
+    return { ok: false, error: PRESET_MESSAGES.invalidJson }
   }
-  if (!isPlainObject(data)) return { ok: false, error: 'This file does not contain an Aurora preset.' }
+  if (!isPlainObject(data)) return { ok: false, error: PRESET_MESSAGES.notPreset }
 
   let name = 'Imported preset'
   let rawSettings: unknown
@@ -100,7 +110,7 @@ export function parsePresetText(text: string, current: Settings): ImportResult {
 
   if (data.format === PRESET_FORMAT) {
     if (typeof data.formatVersion === 'number' && data.formatVersion > PRESET_FORMAT_VERSION) {
-      warnings.push('This preset was made with a newer version of Aurora. Unknown options were skipped.')
+      warnings.push(PRESET_MESSAGES.newer)
     }
     if (typeof data.name === 'string' && data.name.trim()) name = data.name.trim().slice(0, 60)
     if (typeof data.settingsVersion === 'number') version = data.settingsVersion
@@ -108,14 +118,14 @@ export function parsePresetText(text: string, current: Settings): ImportResult {
   } else if (Array.isArray(data.channels)) {
     // A bare settings object (e.g. copied from localStorage) is accepted as well.
     rawSettings = data
-    warnings.push('The file had no preset header; it was read as raw settings.')
+    warnings.push(PRESET_MESSAGES.rawSettings)
   } else {
-    return { ok: false, error: 'This file does not contain an Aurora preset.' }
+    return { ok: false, error: PRESET_MESSAGES.notPreset }
   }
-  if (!isPlainObject(rawSettings)) return { ok: false, error: 'The preset has no settings.' }
+  if (!isPlainObject(rawSettings)) return { ok: false, error: PRESET_MESSAGES.noSettings }
 
   const migrated = migrateSettings(rawSettings, version)
-  if (migrated.fromFuture && !warnings.length) warnings.push('This preset was made with a newer version of Aurora.')
+  if (migrated.fromFuture && !warnings.length) warnings.push(PRESET_MESSAGES.newerShort)
   const { settings, issues } = mergePresetIntoSettings(current, migrated.settings)
   return { ok: true, name, settings, warnings: [...warnings, ...issues] }
 }

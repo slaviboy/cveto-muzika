@@ -1,8 +1,11 @@
 import { AudioWaveform, Bookmark, Gauge, Mic, Palette, Ruler, Shapes, SlidersHorizontal, Sparkles, SunMedium, Timer, type LucideIcon } from 'lucide-react'
 import { useCallback } from 'react'
-import type { Settings } from '../../state/settingsSchema'
+import { createChannel } from '../../state/channelOps'
+import { createDefaultSettings, performanceDefaults } from '../../state/defaults'
+import type { ChannelConfig, Settings } from '../../state/settingsSchema'
 import { useAppStore, type SectionId } from '../../state/useAppStore'
 
+/** Section copy is English source text; components translate it with t(). */
 export interface SectionMeta {
   id: SectionId
   title: string
@@ -28,7 +31,21 @@ export const SECTIONS: SectionMeta[] = [
 
 type GroupKey = 'audio' | 'rings' | 'leds' | 'bars' | 'squares' | 'color' | 'background' | 'tone' | 'timing' | 'performance'
 
-/** Subscribes to one settings group and returns a typed field setter. */
+let defaultsCache: Settings | null = null
+/** Factory defaults, used for per-control reset buttons. */
+export function factoryDefaults(): Settings {
+  return (defaultsCache ??= createDefaultSettings())
+}
+
+let channelDefaultsCache: ChannelConfig | null = null
+export function channelDefaults(): ChannelConfig {
+  return (channelDefaultsCache ??= createChannel())
+}
+
+/**
+ * Subscribes to one settings group. Returns its value, a typed field setter and the group's
+ * defaults (performance defaults follow the selected profile).
+ */
 export function useSettingsGroup<K extends GroupKey>(key: K) {
   const value = useAppStore((s) => s.settings[key])
   const update = useAppStore((s) => s.update)
@@ -39,5 +56,11 @@ export function useSettingsGroup<K extends GroupKey>(key: K) {
       }),
     [key, update],
   )
-  return [value, set] as const
+  let defaults = factoryDefaults()[key]
+  if (key === 'performance') {
+    const profile = (value as Settings['performance']).profile
+    defaults = performanceDefaults(profile === 'custom' ? 'balanced' : profile) as Settings[K]
+  }
+  return [value, set, defaults] as const
 }
+

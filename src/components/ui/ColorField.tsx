@@ -2,6 +2,7 @@ import { Popover } from 'radix-ui'
 import { useState } from 'react'
 import { HexColorPicker } from 'react-colorful'
 import { hslToRgb, hsvToRgb, parseColor, parseHex, rgbToHsl, rgbToHsv, toHex, type Vec3 } from '../../color/colorMath'
+import { useT } from '../../i18n/useT'
 import { cn } from '../../utils/cn'
 
 type Format = 'hex' | 'rgb' | 'hsl' | 'hsv'
@@ -32,6 +33,7 @@ const LIMITS: Record<Exclude<Format, 'hex'>, { labels: string[]; max: number[] }
 }
 
 function ColorInputs({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
+  const t = useT()
   const [format, setFormat] = useState<Format>('hex')
   // Text being typed; null shows the committed value.
   const [draft, setDraft] = useState<string | null>(null)
@@ -40,7 +42,7 @@ function ColorInputs({ value, onChange }: { value: string; onChange: (hex: strin
 
   return (
     <div className="flex flex-col gap-2">
-      <div role="tablist" aria-label="Color format" className="flex gap-0.5 rounded-lg bg-graphite-900 p-0.5">
+      <div role="tablist" aria-label={t('Color format')} className="flex gap-0.5 rounded-lg bg-graphite-900 p-0.5">
         {FORMATS.map((f) => (
           <button
             key={f.id}
@@ -58,7 +60,7 @@ function ColorInputs({ value, onChange }: { value: string; onChange: (hex: strin
       </div>
       {format === 'hex' ? (
         <input
-          aria-label="Hex color"
+          aria-label={t('Hex color')}
           data-testid="color-hex-input"
           className="num h-8 rounded-md border border-line-strong bg-graphite-900 px-2 text-xs uppercase text-ink outline-none focus:border-ice/50"
           value={hexDraft}

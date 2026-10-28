@@ -195,3 +195,30 @@ describe('presets', () => {
     expect(useAppStore.getState().userPresets).toHaveLength(0)
   })
 })
+
+describe('version 2 defaults', () => {
+  it('ships a static background and still LED rings', () => {
+    const d = createDefaultSettings()
+    expect(d.leds.rotationSpeed).toBe(0)
+    expect(d.effects.particles.enabled).toBe(false)
+    expect(d.background.reactivity).toBe(0)
+    expect(d.rings.style).toBe('lines')
+  })
+
+  it('moves values left at the old defaults and keeps deliberate choices', () => {
+    const old = {
+      leds: { rotationSpeed: 0.04 },
+      background: { reactivity: 0.2 },
+      effects: { particles: { enabled: true, amount: 0.35 } },
+    }
+    const { settings } = migrateSettings(old, 1)
+    expect(settings).toMatchObject({ leds: { rotationSpeed: 0 }, background: { reactivity: 0 }, effects: { particles: { enabled: false } } })
+
+    const custom = {
+      leds: { rotationSpeed: 0.5 },
+      background: { reactivity: 0.7 },
+      effects: { particles: { enabled: true, amount: 0.9 } },
+    }
+    expect(migrateSettings(custom, 1).settings).toEqual(custom)
+  })
+})

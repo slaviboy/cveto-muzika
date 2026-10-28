@@ -1,19 +1,15 @@
 import { adjustHex, toHex } from '../color/colorMath'
 import { rainbowColor, sampleGradient, type GradientStop } from '../color/gradient'
 import { bandCenter, bandEdges, type FrequencyScale } from '../audio/frequencyMath'
+import { translate, type Locale } from '../i18n'
 import { createId } from '../utils/misc'
 import { ChannelSchema, MAX_CHANNELS, type ChannelConfig } from './settingsSchema'
 
-/** Musical name for a band, chosen by its centre frequency. */
-export function nameForBand(lo: number, hi: number): string {
+/** Musical name for a band, chosen by its centre frequency, in the given UI language. */
+export function nameForBand(lo: number, hi: number, locale: Locale = 'en'): string {
   const c = bandCenter(lo, hi)
-  if (c < 60) return 'Sub'
-  if (c < 250) return 'Bass'
-  if (c < 500) return 'Low mids'
-  if (c < 2000) return 'Mids'
-  if (c < 4000) return 'Upper mids'
-  if (c < 6500) return 'Presence'
-  return 'Air'
+  const key = c < 60 ? 'Sub' : c < 250 ? 'Bass' : c < 500 ? 'Low mids' : c < 2000 ? 'Mids' : c < 4000 ? 'Upper mids' : c < 6500 ? 'Presence' : 'Air'
+  return translate(locale, key)
 }
 
 /** Derives the supporting colors of a channel from its primary color. */
@@ -64,6 +60,7 @@ export function generateChannels(
   maxHz = 16000,
   scale: FrequencyScale = 'log',
   colorFn: ColorSourceFn = rainbowSource,
+  locale: Locale = 'en',
 ): ChannelConfig[] {
   const n = Math.max(1, Math.min(MAX_CHANNELS, Math.round(count)))
   const edges = bandEdges(n, minHz, maxHz, scale)
@@ -73,7 +70,7 @@ export function generateChannels(
     const hi = Math.round(edges[i + 1] * 10) / 10
     channels.push(
       createChannel({
-        name: nameForBand(lo, hi),
+        name: nameForBand(lo, hi, locale),
         minHz: lo,
         maxHz: hi,
         position: n === 1 ? 0.5 : i / (n - 1),
@@ -91,9 +88,9 @@ interface BandSpec {
   color: string
 }
 
-function fromSpecs(specs: BandSpec[]): ChannelConfig[] {
+function fromSpecs(specs: BandSpec[], locale: Locale): ChannelConfig[] {
   return specs.map((s, i) =>
-    createChannel({ name: s.name, minHz: s.min, maxHz: s.max, color: s.color, position: specs.length === 1 ? 0.5 : i / (specs.length - 1) }),
+    createChannel({ name: translate(locale, s.name), minHz: s.min, maxHz: s.max, color: s.color, position: specs.length === 1 ? 0.5 : i / (specs.length - 1) }),
   )
 }
 
@@ -109,7 +106,7 @@ export const AURORA_PALETTE: GradientStop[] = [
 export const CHANNEL_LAYOUTS = {
   aurora: {
     label: 'Aurora six-band',
-    build: () =>
+    build: (locale: Locale = 'en') =>
       fromSpecs([
         { name: 'Sub', min: 20, max: 60, color: '#3b2bff' },
         { name: 'Bass', min: 60, max: 250, color: '#0a8dff' },
@@ -117,55 +114,55 @@ export const CHANNEL_LAYOUTS = {
         { name: 'Mids', min: 500, max: 2000, color: '#6dff9e' },
         { name: 'Presence', min: 2000, max: 6000, color: '#b45cff' },
         { name: 'Air', min: 6000, max: 16000, color: '#ff5ab8' },
-      ]),
+      ], locale),
   },
   rgb3: {
     label: 'Three-band RGB',
-    build: () =>
+    build: (locale: Locale = 'en') =>
       fromSpecs([
         { name: 'Bass', min: 20, max: 250, color: '#ff2d4b' },
         { name: 'Mids', min: 250, max: 2000, color: '#25ff7a' },
         { name: 'Highs', min: 2000, max: 16000, color: '#2f6bff' },
-      ]),
+      ], locale),
   },
   spectrum6: {
     label: 'Six-band spectrum',
-    build: () => generateChannels(6, 20, 16000, 'log', paletteSource(AURORA_PALETTE)),
+    build: (locale: Locale = 'en') => generateChannels(6, 20, 16000, 'log', paletteSource(AURORA_PALETTE), locale),
   },
   rainbow8: {
     label: 'Eight-band rainbow',
-    build: () => generateChannels(8, 20, 16000, 'log', rainbowSource),
+    build: (locale: Locale = 'en') => generateChannels(8, 20, 16000, 'log', rainbowSource, locale),
   },
   deepWarmBright: {
     label: 'Deep bass, warm mids, bright highs',
-    build: () =>
+    build: (locale: Locale = 'en') =>
       fromSpecs([
         { name: 'Deep bass', min: 20, max: 120, color: '#3a2bff' },
         { name: 'Warm mids', min: 120, max: 2000, color: '#ff9a3d' },
         { name: 'Bright highs', min: 2000, max: 16000, color: '#dff4ff' },
-      ]),
+      ], locale),
   },
   deepSpectrum: {
     label: 'Custom mapping (deep spectrum)',
-    build: () =>
+    build: (locale: Locale = 'en') =>
       fromSpecs([
         { name: 'Sub', min: 20, max: 80, color: '#1d2bff' },
         { name: 'Bass', min: 80, max: 250, color: '#00d5ff' },
         { name: 'Low mids', min: 250, max: 1000, color: '#8b4dff' },
         { name: 'Upper mids', min: 1000, max: 4000, color: '#ff3bd4' },
         { name: 'Highs', min: 4000, max: 12000, color: '#ff8a2a' },
-      ]),
+      ], locale),
   },
 } as const
 
 export type ChannelLayoutId = keyof typeof CHANNEL_LAYOUTS
 
-export function defaultChannels(): ChannelConfig[] {
-  return CHANNEL_LAYOUTS.aurora.build()
+export function defaultChannels(locale: Locale = 'en'): ChannelConfig[] {
+  return CHANNEL_LAYOUTS.aurora.build(locale)
 }
 
 /** New channel placed above the current highest band (or splitting the range if there is no room). */
-export function nextChannel(channels: ChannelConfig[]): ChannelConfig {
+export function nextChannel(channels: ChannelConfig[], locale: Locale = 'en'): ChannelConfig {
   const ranges = channels.map(channelRange)
   const top = ranges.reduce((m, r) => Math.max(m, r[1]), 0)
   let lo = top > 0 ? top : 20
@@ -175,11 +172,11 @@ export function nextChannel(channels: ChannelConfig[]): ChannelConfig {
     hi = 6000
   }
   const t = channels.length / Math.max(1, Math.min(MAX_CHANNELS, channels.length + 1))
-  return createChannel({ name: nameForBand(lo, hi), minHz: Math.round(lo), maxHz: Math.round(hi), color: toHex(rainbowColor(t)) })
+  return createChannel({ name: nameForBand(lo, hi, locale), minHz: Math.round(lo), maxHz: Math.round(hi), color: toHex(rainbowColor(t)) })
 }
 
-export function duplicateChannel(ch: ChannelConfig): ChannelConfig {
-  return { ...ch, id: createId('ch'), name: `${ch.name} copy`.slice(0, 40) }
+export function duplicateChannel(ch: ChannelConfig, locale: Locale = 'en'): ChannelConfig {
+  return { ...ch, id: createId('ch'), name: translate(locale, '{name} copy', { name: ch.name }).slice(0, 40) }
 }
 
 export function moveItem<T>(list: T[], from: number, to: number): T[] {

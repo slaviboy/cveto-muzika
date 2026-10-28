@@ -13,6 +13,8 @@ import { addInstanceAttributes, createQuadGeometry, type InstanceAttributes } fr
  * as segmented LED stacks or continuous fills, with optional peak markers.
  * lightwall: a full-screen grid where each row follows a channel and columns walk through that
  * channel's sub-bands.
+ * leds: a full-screen equalizer of round LEDs; rows follow from the column count so LEDs stay
+ * circular, and each column's peak is held as a single lit LED.
  * Layout is computed on a (u = column axis, v = growth axis) plane, then mapped to x/y by orientation.
  */
 export class BarVisualization extends BaseVisualization {
@@ -52,7 +54,22 @@ export class BarVisualization extends BaseVisualization {
 
   protected structureKey(ctx: FrameContext): string {
     const b = ctx.settings.bars
-    return [b.style, b.columns, b.rows, b.segmented, b.mirror, b.peakMarkers].join('|')
+    return [b.style, b.columns, b.style === 'leds' ? this.ledRows(ctx) : b.rows, b.segmented, b.mirror, b.peakMarkers].join('|')
+  }
+
+  /** Full-screen area used by the LED style (u = column axis, v = growth axis). */
+  private ledArea(ctx: FrameContext) {
+    const L = ctx.layout
+    const vertical = ctx.settings.bars.orientation === 'vertical'
+    return { spanU: (vertical ? L.width : L.height) * 0.98, spanV: (vertical ? L.height : L.width) * 0.96 }
+  }
+
+  /** LED rows per side so that the LED pitch matches the column pitch (round LEDs). */
+  private ledRows(ctx: FrameContext) {
+    const b = ctx.settings.bars
+    const { spanU, spanV } = this.ledArea(ctx)
+    const half = b.mirror === 'vertical' || b.mirror === 'both' ? spanV / 2 : spanV
+    return Math.max(3, Math.min(160, Math.round(half / (spanU / b.columns))))
   }
 
   protected build(ctx: FrameContext) {
@@ -68,11 +85,12 @@ export class BarVisualization extends BaseVisualization {
     const cellLogical: number[] = []
     const cellSegment: number[] = []
     const cellSide: number[] = []
-    if (b.style === 'equalizer') {
+    if (b.style !== 'lightwall') {
+      const segmented = b.style === 'leds' || b.segmented
       this.logicalRows = 1
-      this.segments = b.segmented ? R : 1
+      this.segments = b.style === 'leds' ? this.ledRows(ctx) : segmented ? R : 1
       // A continuous bar mirrored vertically is a single centre-filled instance.
-      const sides = mirrorV && b.segmented ? 2 : 1
+      const sides = mirrorV && segmented ? 2 : 1
       for (let v = 0; v < C; v++) {
         for (let side = 0; side < sides; side++) {
           for (let sgm = 0; sgm < this.segments; sgm++) {
@@ -83,7 +101,8 @@ export class BarVisualization extends BaseVisualization {
         }
       }
       const peakSides = mirrorV ? 2 : 1
-      this.peakCount = b.peakMarkers ? C * peakSides : 0
+      // LED bars show the peak as a lit LED instead of a separate marker.
+      this.peakCount = b.peakMarkers && b.style === 'equalizer' ? C * peakSides : 0
       this.peakLogical = new Int32Array(this.peakCount)
       this.peakSide = new Int8Array(this.peakCount)
       this.peakU = new Float32Array(this.peakCount)
@@ -150,8 +169,10 @@ export class BarVisualization extends BaseVisualization {
     const R = b.rows
     this.columnsCount = C
     const L = ctx.layout
-    const spanU = (vertical ? L.width : L.height) * b.widthScale
-    const spanV = (vertical ? L.height : L.width) * b.heightScale
+    const leds = b.style === 'leds'
+    const area = leds ? this.ledArea(ctx) : null
+    const spanU = area ? area.spanU : (vertical ? L.width : L.height) * b.widthScale
+    const spanV = area ? area.spanV : (vertical ? L.height : L.width) * b.heightScale
     const colW = spanU / C
     const colors = newElementColors()
     const tmp: Vec3 = [0, 0, 0]
@@ -167,7 +188,7 @@ export class BarVisualization extends BaseVisualization {
       for (let lc = 0; lc < this.logicalCols; lc++) {
         const idx = lr * this.logicalCols + lc
         const t = (lc + 0.5) / this.logicalCols
-        if (b.style === 'equalizer') {
+        if (b.style !== 'lightwall') {
           const hit = spreadAcross(t, enabled, weights)
           this.elemChannel[idx] = hit.channel
           this.elemSub[idx] = hit.sub
@@ -193,25 +214,29 @@ export class BarVisualization extends BaseVisualization {
       rect[o + 3] = sizeV
     }
 
-    if (b.style === 'equalizer') {
-      const barW = Math.max(L.pixel * 1.5, colW * (1 - b.gap))
+    if (b.style !== 'lightwall') {
       const half = mirrorV ? spanV / 2 : spanV
       this.span = half
       const segSize = half / this.segments
+      // LEDs are round: one diameter for both axes.
+      const ledSize = Math.max(L.pixel * 1.5, Math.min(colW, segSize) * (1 - b.gap))
+      const barW = leds ? ledSize : Math.max(L.pixel * 1.5, colW * (1 - b.gap))
       const baseV = mirrorV ? 0 : -spanV / 2
       const perColumn = this.cellsPerColumn()
       for (let k = 0; k < this.cells; k++) {
         const col = Math.floor(k / perColumn)
         const u = -spanU / 2 + (col + 0.5) * colW
         const o = k * 4
-        if (b.segmented) {
+        if (leds) {
+          writeRect(o, u, baseV + this.cellSide[k] * (this.cellSegment[k] + 0.5) * segSize, ledSize, ledSize)
+        } else if (b.segmented) {
           const v = baseV + this.cellSide[k] * (this.cellSegment[k] + 0.5) * segSize
           writeRect(o, u, v, barW, Math.max(L.pixel, segSize * (1 - b.segmentGap)))
         } else {
           writeRect(o, u, mirrorV ? 0 : baseV + half / 2, barW, mirrorV ? spanV : half)
         }
         const li = this.cellLogical[k]
-        const along = b.segmented ? this.cellSegment[k] / Math.max(1, this.segments - 1) : 0
+        const along = leds || b.segmented ? this.cellSegment[k] / Math.max(1, this.segments - 1) : 0
         this.writeCellColors(ctx, k, li, along, (col + 0.5) / C, colors, tmp, a, bb, gl, m)
         m[o + 1] = b.cornerRadius
         m[o + 2] = rotation
@@ -323,14 +348,22 @@ export class BarVisualization extends BaseVisualization {
     const dyn = this.attrs.iDyn.array as Float32Array
     const vertical = b.orientation === 'vertical'
     const mirrorV = b.mirror === 'vertical' || b.mirror === 'both'
-    if (b.style === 'equalizer') {
+    if (b.style !== 'lightwall') {
       const S = this.segments
+      const leds = b.style === 'leds'
       for (let k = 0; k < this.cells; k++) {
-        const v = this.value[this.cellLogical[k]]
+        const li = this.cellLogical[k]
+        const v = this.value[li]
         const o = k * 4
-        if (b.segmented) {
-          const lit = Math.min(1, Math.max(0, Math.min(1.2, v) * S - this.cellSegment[k]))
-          dyn[o] = lit * (0.4 + 0.8 * Math.min(1.5, v))
+        if (leds || b.segmented) {
+          const seg = this.cellSegment[k]
+          const lit = Math.min(1, Math.max(0, Math.min(1.2, v) * S - seg))
+          let level = lit * (0.4 + 0.8 * Math.min(1.5, v))
+          if (leds && b.peakMarkers) {
+            const peakSeg = Math.min(S - 1, Math.floor(Math.min(1, this.peak[li]) * S - 1e-6))
+            if (seg === peakSeg && this.peak[li] > 0.02) level = Math.max(level, 0.9)
+          }
+          dyn[o] = level
           dyn[o + 1] = 1
         } else {
           dyn[o] = Math.min(1.5, v)
@@ -365,7 +398,7 @@ export class BarVisualization extends BaseVisualization {
     }
     touch(this.attrs.iDyn, this.cells)
 
-    const mixEnergy = b.colorMode === 'vertical' ? (b.segmented ? 0.35 : 1) : ctx.colors.energyMix(s)
+    const mixEnergy = b.colorMode === 'vertical' ? (b.segmented || b.style === 'leds' ? 0.35 : 1) : ctx.colors.energyMix(s)
     for (const mat of [this.material, this.peakMaterial]) {
       if (!mat) continue
       const u = mat.uniforms
@@ -379,11 +412,12 @@ export class BarVisualization extends BaseVisualization {
       u.uDisplace.value = ctx.displace * ctx.layout.unit
       u.uDisplaceScale.value = ctx.displaceScale
       u.uPulse.value = ctx.pulse * 0.5
-      u.uShape.value = 0
-      u.uUnlit.value = b.style === 'lightwall' ? 0.05 : 0.06
-      u.uLens.value = b.style === 'lightwall' ? 0.6 : 0.25
+      u.uShape.value = b.style === 'leds' ? 1 : 0
+      u.uUnlit.value = b.style === 'leds' ? 0.07 : b.style === 'lightwall' ? 0.05 : 0.06
+      u.uLens.value = b.style === 'leds' ? 1 : b.style === 'lightwall' ? 0.6 : 0.25
       u.uFillMode.value = 0
     }
+    if (b.style === 'leds') this.material!.uniforms.uHalo.value = 0.3 + b.glow * 0.35
     this.material!.uniforms.uFillMode.value = b.style === 'equalizer' && !b.segmented ? (mirrorV ? 2 : 1) : 0
     if (this.peakMaterial) {
       this.peakMaterial.uniforms.uHalo.value = 0.6
